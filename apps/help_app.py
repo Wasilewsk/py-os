@@ -22,10 +22,15 @@ class HelpApp(BlindApp):
                 "Enter: Launch or activate the selected item.\n"
                 "F1: Speak help for the current app.\n"
                 "Ctrl+D: Speak full documentation for the current app.\n"
-                "Alt+F4: Close the current app.\n\n"
+                "Close window: Use your platform's standard close shortcut, such as Alt+F4 on Windows or Command+W on Mac.\n\n"
                 "File Explorer Shortcuts:\n"
                 "Backspace: Go up one folder level.\n"
                 "Alt + Left: Go back in history."
+            ),
+            "User Guide: Platform Support": (
+                "PyOS is designed to run on Windows, macOS, and Linux. "
+                "Speech, audio playback, and recording features may use different backends on each platform. "
+                "Open the Platform Diagnostics app to hear what is available on the current machine."
             ),
             "Developer: Creating an App": (
                 "To create a PyOS app, add a Python file to the 'apps' folder. "

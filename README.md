@@ -3,9 +3,11 @@
 An accessible operating system simulator for blind and visually impaired users.
 
 ## Features
-- **Hybrid Speech Engine**: Automatically uses NVDA if running (via NVDA Controller Client), falls back to `pyttsx3` for offline TTS.
+- **Cross-platform Speech Engine**: Uses NVDA on Windows when available, macOS `say` on Mac, and Speech Dispatcher, eSpeak, or `pyttsx3` on Linux depending on what is installed.
 - **High Contrast GUI**: Built with `wxPython`, optimized for screen readers and low-vision users.
 - **Virtual File System**: A safe, sandboxed environment (`/vfs` folder) to practice file management.
+- **VoiceOver-friendly navigation on macOS**: Focus changes avoid excessive duplicate announcements so VoiceOver can read controls naturally.
+- **Platform Diagnostics app**: Reports available speech backends, host shells, file-open helpers, and optional dependencies on the current machine.
 - **Keyboard Shortcuts**:
   - `Ctrl + T`: Speak current time.
   - `Ctrl + W`: Speak current location (path).
@@ -20,6 +22,22 @@ An accessible operating system simulator for blind and visually impaired users.
 - `time`: Speak the current time.
 - `where`: Speak current directory.
 - `exit`: Close the simulator.
+- `shell <type>`: Open a host shell such as `zsh`, `bash`, `sh`, `cmd`, or `powershell`, depending on your platform.
+
+## macOS Notes
+
+- On macOS, py-os uses the built-in `say` command for spoken feedback.
+- The desktop reduces automatic focus chatter on macOS so VoiceOver can announce buttons and controls more clearly.
+- File Explorer uses the native `open` command to launch files with their default Mac app.
+- By default, app data is stored in the repo-local `.py-os-data/` folder. Set `PY_OS_DATA_DIR` if you want it elsewhere.
+
+## Support Matrix
+
+- Windows: Best with `wxPython`, optional NVDA Controller DLL, and optional `sounddevice` plus `soundfile` for recording.
+- macOS: Best with `wxPython`; speech works with built-in `say`, and recording works when `sounddevice` plus `soundfile` are installed.
+- Linux: Best with `wxPython`; speech can use `spd-say`, `espeak-ng`, `espeak`, or `pyttsx3`, depending on what is installed.
+
+Open the `Platform Diagnostics` app after launch to see the exact support level on the current machine.
 
 ## NVDA Integration (Optional)
 To enable direct NVDA support:
@@ -52,10 +70,17 @@ To get started with py-os and prepare it for use from source:
     # source venv/bin/activate
     ```
 
-3.  **Install FFmpeg:**
-    The system uses FFmpeg for audio playback. Install it via winget:
+3.  **Install FFmpeg (Optional but recommended):**
+    The system can use FFmpeg tools such as `ffplay` for audio playback fallbacks.
     ```bash
+    # Windows
     winget install ffmpeg
+
+    # macOS
+    brew install ffmpeg
+
+    # Linux (Debian/Ubuntu example)
+    sudo apt install ffmpeg
     ```
 
 4.  **Install dependencies:**

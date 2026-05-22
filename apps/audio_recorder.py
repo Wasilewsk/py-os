@@ -1,14 +1,29 @@
 import os
+import subprocess
 import threading
+import shutil
 from datetime import datetime
 
 import numpy as np
-import sounddevice as sd
-import soundfile as sf
 import wx
 
 import audio_devices
 from api import BlindApp
+from platform_support import open_external_file
+
+try:
+    import sounddevice as sd
+    HAS_SOUNDDEVICE = True
+except ImportError:
+    sd = None
+    HAS_SOUNDDEVICE = False
+
+try:
+    import soundfile as sf
+    HAS_SOUNDFILE = True
+except ImportError:
+    sf = None
+    HAS_SOUNDFILE = False
 
 
 class AudioRecorderApp(BlindApp):
@@ -44,6 +59,9 @@ class AudioRecorderApp(BlindApp):
         self.playback_rate = None
         self.playback_channels = None
         self.playback_lock = threading.Lock()
+        self.external_playback_process = None
+        self.afplay_path = shutil.which("afplay")
+        self.ffplay_path = shutil.which("ffplay")
 
     def run(self, file_path=None):
         self.frame = wx.Frame(None, title="Media Studio", size=(700, 560))
@@ -140,6 +158,9 @@ class AudioRecorderApp(BlindApp):
             event.Skip()
 
     def on_start_recording(self, event=None):
+        if not HAS_SOUNDDEVICE or not HAS_SOUNDFILE:
+            self.api.speak("Recording needs the sounddevice and soundfile Python packages on this system.")
+            return
         if self.is_recording:
             self.api.speak("Already recording.")
             return
@@ -209,6 +230,9 @@ class AudioRecorderApp(BlindApp):
         self.api.speak(f"Recording stopped. {self.recording_time} seconds.")
 
     def on_save_recording(self, event=None):
+        if not HAS_SOUNDFILE:
+            self.api.speak("Saving recordings needs the soundfile Python package.")
+            return
         if len(self.recording_data) == 0:
             self.api.speak("No recording to save.")
             return
@@ -276,17 +300,27 @@ class AudioRecorderApp(BlindApp):
         if not os.path.exists(path):
             self.api.speak("File does not exist.")
             return
+        self.on_stop_playback()
         try:
-            data, rate = sf.read(path, dtype="float32")
-            if data.ndim == 1:
-                data = data[:, np.newaxis]
-            with self.playback_lock:
-                self.current_playback_path = path
-                self.playback_data = data
-                self.playback_rate = rate
-                self.playback_channels = data.shape[1]
-                self.playback_position = 0
-                self.is_paused = False
+            if HAS_SOUNDFILE:
+                data, rate = sf.read(path, dtype="float32")
+                if data.ndim == 1:
+                    data = data[:, np.newaxis]
+                with self.playback_lock:
+                    self.current_playback_path = path
+                    self.playback_data = data
+                    self.playback_rate = rate
+                    self.playback_channels = data.shape[1]
+                    self.playback_position = 0
+                    self.is_paused = False
+            else:
+                with self.playback_lock:
+                    self.current_playback_path = path
+                    self.playback_data = None
+                    self.playback_rate = None
+                    self.playback_channels = None
+                    self.playback_position = 0
+                    self.is_paused = False
             self.api.speak(f"Loaded {os.path.basename(path)}.")
         except Exception as e:
             self.api.speak(f"Could not load audio: {e}")
@@ -297,6 +331,9 @@ class AudioRecorderApp(BlindApp):
         return audio_devices.resolve_selected_index(outputs, config, "output_device_index", "output_device")
 
     def on_play(self, event=None):
+        if not HAS_SOUNDDEVICE or not HAS_SOUNDFILE:
+            self._play_with_system_player()
+            return
         with self.playback_lock:
             if self.playback_data is None:
                 self.api.speak("Load a file first.")
@@ -316,7 +353,41 @@ class AudioRecorderApp(BlindApp):
         except Exception as e:
             self.api.speak(f"Playback error: {e}")
 
+    def _play_with_system_player(self):
+        with self.playback_lock:
+            path = self.current_playback_path
+        if not path:
+            self.api.speak("Load a file first.")
+            return
+        if self.external_playback_process and self.external_playback_process.poll() is None:
+            self.api.speak("Already playing.")
+            return
+        try:
+            if self.afplay_path:
+                self.external_playback_process = subprocess.Popen(
+                    [self.afplay_path, path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            elif self.ffplay_path:
+                self.external_playback_process = subprocess.Popen(
+                    [self.ffplay_path, "-nodisp", "-autoexit", path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                open_external_file(path)
+                self.external_playback_process = None
+            self.is_playing = True
+            self.is_paused = False
+            self.api.speak("Playing audio.")
+        except Exception as error:
+            self.api.speak(f"Playback error: {error}")
+
     def on_pause_resume(self, event=None):
+        if not HAS_SOUNDDEVICE or not HAS_SOUNDFILE:
+            self.api.speak("Pause and resume are unavailable in basic playback mode on this system.")
+            return
         with self.playback_lock:
             if self.playback_data is None:
                 self.api.speak("Load a file first.")
@@ -336,6 +407,16 @@ class AudioRecorderApp(BlindApp):
             self.on_play()
 
     def on_stop_playback(self, event=None):
+        if not HAS_SOUNDDEVICE or not HAS_SOUNDFILE:
+            if self.external_playback_process and self.external_playback_process.poll() is None:
+                try:
+                    self.external_playback_process.terminate()
+                except Exception:
+                    pass
+            self.external_playback_process = None
+            self.is_playing = False
+            self.is_paused = False
+            return
         with self.playback_lock:
             if self.playback_data is None:
                 return
@@ -348,9 +429,15 @@ class AudioRecorderApp(BlindApp):
     def on_close(self, event=None):
         self.is_recording = False
         try:
-            sd.stop()
+            if HAS_SOUNDDEVICE:
+                sd.stop()
         except Exception:
             pass
+        if self.external_playback_process and self.external_playback_process.poll() is None:
+            try:
+                self.external_playback_process.terminate()
+            except Exception:
+                pass
         if self.frame:
             self.frame.Destroy()
         self.api.play_sound("close")

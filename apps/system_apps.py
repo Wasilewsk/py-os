@@ -2,9 +2,12 @@ import wx
 import os
 import datetime
 import subprocess
+import sys
+import platform
 import speech
 from api import BlindApp
 import audio_devices
+from platform_support import open_external_file
 
 try:
     import sounddevice as sd
@@ -16,12 +19,13 @@ class SettingsApp(BlindApp):
     def __init__(self, api):
         super().__init__(api)
         self.name = "System Settings"
-        self.description = "Configure tts, audio devices, updates, and mor."
+        self.description = "Configure speech, audio devices, themes, and updates."
         self.help_text = "Use Tab to navigate controls, and Enter to save."
-        self.docs = "Settings allows you to customize the OS behavior. Voice speed can be adjusted from 50 to 400. Configure audio input and output devices."
+        self.docs = "Settings lets you adjust speech rate, choose a speech backend, configure audio devices, and manage sound themes."
         self.device_config_path = self.api.get_data_path("device_config.json")
         self.input_entries = []
         self.output_entries = []
+        self.platform_name = platform.system()
 
     def run(self):
         self.frame = wx.Frame(None, title="Settings", size=(500, 600))
@@ -42,6 +46,7 @@ class SettingsApp(BlindApp):
         sizer.Add(voice_label, 0, wx.ALL, 10)
         
         self.speed_slider = wx.Slider(panel, value=200, minValue=50, maxValue=400, style=wx.SL_HORIZONTAL)
+        self.speed_slider.SetValue(getattr(self.api.engine, "get_rate", lambda: 200)())
         self.speed_slider.SetBackgroundColour(wx.Colour(40, 40, 40))
         sizer.Add(self.speed_slider, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -50,11 +55,7 @@ class SettingsApp(BlindApp):
         speech_label.SetForegroundColour(wx.Colour(255, 255, 255))
         sizer.Add(speech_label, 0, wx.ALL, 10)
 
-        self.speech_modes = [
-            ("Auto (NVDA when available)", "auto"),
-            ("NVDA", "nvda"),
-            ("SAPI", "sapi"),
-        ]
+        self.speech_modes = getattr(self.api.engine, "get_available_modes", lambda: [("Auto", "auto")])()
         self.speech_choice = wx.Choice(panel, choices=[m[0] for m in self.speech_modes])
         current_mode = getattr(self.api.engine, "get_mode", lambda: "auto")()
         idx = next((i for i, m in enumerate(self.speech_modes) if m[1] == current_mode), 0)
@@ -166,7 +167,7 @@ class SettingsApp(BlindApp):
         panel.SetSizer(sizer)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
         self.frame.Show()
-        self.api.speak("Settings opened. Configure voice speed and audio devices.")
+        self.api.speak("Settings opened. Configure speech and audio devices.")
 
     def get_input_devices(self):
         """Get list of available input devices."""
@@ -219,9 +220,9 @@ class SettingsApp(BlindApp):
         if not announce:
             return
         if speech_mode == "nvda" and not getattr(self.api.engine, "use_nvda", False):
-            self.api.speak("NVDA is not active, so speech is using SAPI until NVDA is available.", interrupt=False)
+            self.api.speak("NVDA is not active, so speech is using the system voice until NVDA is available.", interrupt=False)
         elif mode_ok:
-            spoken_name = "Auto" if speech_mode == "auto" else speech_mode.upper()
+            spoken_name = next((label for label, value in self.speech_modes if value == speech_mode), speech_mode)
             self.api.speak(f"Speech mode switched to {spoken_name}.", interrupt=False)
         else:
             self.api.speak("Could not switch speech mode.", interrupt=False)
@@ -233,7 +234,14 @@ class SettingsApp(BlindApp):
         self.api.speak("Checking for updates...")
         try:
             subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/wasilewsk/py-os.git"], check=True)
-            result = subprocess.run(["git", "pull", "origin", "master"], capture_output=True, text=True, check=True)
+            branch_result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            branch_name = branch_result.stdout.strip() or "master"
+            result = subprocess.run(["git", "pull", "origin", branch_name], capture_output=True, text=True, check=True)
             
             if "Already up to date" in result.stdout:
                 self.api.speak("System is already up to date. Checking requirements...")
@@ -241,7 +249,7 @@ class SettingsApp(BlindApp):
                 self.api.speak("Core updates downloaded. Updating requirements...")
             
             # Re-install requirements
-            subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
+            subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
             self.cleanup_deprecated_sound_artifacts()
             self.api.speak("Update completed successfully. All dependencies are up to date.")
         except subprocess.CalledProcessError as e:
@@ -267,6 +275,7 @@ class SettingsApp(BlindApp):
         """Save settings and close."""
         # Ensure speech selection is persisted even if user didn't change focus after selecting.
         self._apply_speech_mode_selection(announce=False)
+        getattr(self.api.engine, "set_rate", lambda _rate: False)(self.speed_slider.GetValue())
 
         if HAS_SOUNDDEVICE:
             input_sel = self.input_choice.GetSelection()
@@ -297,6 +306,7 @@ class FileExplorerApp(BlindApp):
         self.current_dir = os.getcwd()
         self.history = []
         self.items = []
+        self.platform_name = platform.system()
 
     def run(self):
         self.frame = wx.Frame(None, title=f"File Explorer - {self.current_dir}", size=(700, 500))
@@ -413,18 +423,17 @@ class FileExplorerApp(BlindApp):
         if is_dir:
             self.go_to_path(full_path)
         else:
-            self.api.speak(f"Opening {name}", interrupt=False)
-            lower = name.lower()
-            if lower.endswith((".txt", ".md", ".log", ".json", ".py", ".csv")):
-                self.api.launch_app("TextEditorApp", file_path=full_path)
-            elif lower.endswith((".wav", ".mp3", ".ogg", ".flac")):
-                self.api.launch_app("AudioRecorderApp", file_path=full_path)
-            else:
-                try:
-                    if os.name == 'nt': os.startfile(full_path)
-                    else: subprocess.Popen(['xdg-open', full_path])
-                except Exception as e:
-                    self.api.speak(f"Could not open file: {e}")
+                self.api.speak(f"Opening {name}", interrupt=False)
+                lower = name.lower()
+                if lower.endswith((".txt", ".md", ".log", ".json", ".py", ".csv")):
+                    self.api.launch_app("TextEditorApp", file_path=full_path)
+                elif lower.endswith((".wav", ".mp3", ".ogg", ".flac")):
+                    self.api.launch_app("AudioRecorderApp", file_path=full_path)
+                else:
+                    try:
+                        open_external_file(full_path)
+                    except Exception as e:
+                        self.api.speak(f"Could not open file: {e}")
 
     def on_key_down(self, event):
         keycode = event.GetKeyCode()

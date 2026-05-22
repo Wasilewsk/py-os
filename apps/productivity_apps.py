@@ -55,7 +55,7 @@ class RemindersApp(BlindApp):
         self.name = "Reminders"
         self.description = "Save and hear your reminders."
         self.help_text = "Type a reminder and press Enter to save. Use arrows to browse saved reminders."
-        self.docs = "Reminders are stored in your .py-os folder and persist between sessions."
+        self.docs = "Reminders are stored in the app data folder and persist between sessions."
         self.db_path = self.api.get_data_path("reminders.json")
         self.load_reminders()
 

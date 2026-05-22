@@ -5,6 +5,8 @@ import subprocess # For executing files
 import importlib # Import importlib for dynamic module loading
 
 from message_service import MessageService
+from app_paths import get_data_dir
+from platform_support import format_support_report, get_support_report
 
 class BlindApp:
     """Base class for all BlindOS applications."""
@@ -39,7 +41,7 @@ class SystemAPI:
         self.engine = engine
         self.sounds = sounds
         self.message_service = MessageService(self)
-        self.data_dir = os.path.join(os.path.expanduser("~"), ".py-os")
+        self.data_dir = get_data_dir()
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
 
@@ -54,6 +56,12 @@ class SystemAPI:
 
     def play_sound(self, sound_type):
         self.sounds.play(sound_type)
+
+    def get_support_report(self):
+        return get_support_report()
+
+    def format_support_report(self):
+        return format_support_report()
 
     def notify(self, title: str, message: str, level: str = 'info'):
         """

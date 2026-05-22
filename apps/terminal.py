@@ -6,7 +6,7 @@ class TerminalApp(BlindApp):
         super().__init__(api)
         self.name = "Terminal"
         self.description = "Command-line interface to the system kernel."
-        self.help_text = "Type OS commands like 'list', 'create', 'shutdown', 'reboot', or 'winshell' and press Enter."
+        self.help_text = "Type OS commands like 'list', 'create', 'shutdown', 'reboot', or 'shell' and press Enter."
         self.docs = "Terminal provides direct access to the Virtual OS Kernel. Use 'help' to see all commands."
 
     def run(self):

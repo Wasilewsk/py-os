@@ -3,6 +3,9 @@ import datetime
 import json
 import subprocess
 import threading
+import platform
+import shutil
+from platform_support import get_shells
 
 class VirtualOS:
     def __init__(self, root_dir="vfs"):
@@ -11,6 +14,7 @@ class VirtualOS:
         self.shell_proc = None
         self.shell_type = None
         self.output_callback = None
+        self.platform_name = platform.system()
         if not os.path.exists(self.root_dir):
             os.makedirs(self.root_dir)
             # Create some default files
@@ -45,14 +49,39 @@ class VirtualOS:
         self.shell_proc = None
         self.shell_type = None
         if self.output_callback:
-            self.output_callback("Windows Shell session ended.")
+            self.output_callback("Shell session ended.")
+
+    def _available_shells(self):
+        return get_shells()
+
+    def _launch_shell(self, shell_type):
+        shells = self._available_shells()
+        if shell_type not in shells:
+            available = ", ".join(shells) if shells else "none"
+            return f"Unknown shell type: {shell_type}. Available shells: {available}."
+
+        popen_kwargs = {
+            "args": [shells[shell_type]],
+            "stdin": subprocess.PIPE,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+            "text": True,
+            "bufsize": 1,
+        }
+        if self.platform_name == "Windows":
+            popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+        self.shell_proc = subprocess.Popen(**popen_kwargs)
+        self.shell_type = shell_type
+        threading.Thread(target=self._shell_reader, daemon=True).start()
+        return f"Switched to {shell_type}. Type 'exit' to return to PyOS."
 
     def execute(self, command_str):
         if self.shell_proc:
             if command_str.lower().strip() == "exit":
                 self.shell_proc.stdin.write("exit\n")
                 self.shell_proc.stdin.flush()
-                return "Exiting Windows Shell..."
+                return "Exiting shell..."
             
             self.shell_proc.stdin.write(command_str + "\n")
             self.shell_proc.stdin.flush()
@@ -66,7 +95,12 @@ class VirtualOS:
         args = parts[1:]
 
         if cmd == "help":
-            return "Available commands: list, open, create, delete, where, time, exit, shutdown, reboot, winshell."
+            available_shells = ", ".join(self._available_shells()) or "none"
+            return (
+                "Available commands: list, open, create, delete, where, time, exit, "
+                "shutdown, reboot, shell. Available host shells: "
+                f"{available_shells}."
+            )
         
         elif cmd == "list":
             real_path = self.get_real_path(self.cwd)
@@ -124,38 +158,21 @@ class VirtualOS:
                 return f"Item {file_name} not found."
 
         elif cmd == "shutdown":
-            subprocess.Popen(["shutdown", "/s", "/t", "0"])
-            return "System is shutting down..."
+            return "Host shutdown is disabled from the PyOS simulator for safety."
 
         elif cmd == "reboot":
-            subprocess.Popen(["shutdown", "/r", "/t", "0"])
-            return "System is rebooting..."
+            return "Host restart is disabled from the PyOS simulator for safety."
 
-        elif cmd == "winshell":
+        elif cmd in {"winshell", "shell"}:
             if not args or args[0] == "help":
-                return "Winshell usage: winshell powershell | winshell cmd"
-            
+                available_shells = ", ".join(self._available_shells()) or "none"
+                return f"Shell usage: shell <type>. Available shells: {available_shells}."
+
             shell_type = args[0]
-            executable = "cmd.exe" if shell_type == "cmd" else "powershell.exe"
-            
-            if shell_type not in ["cmd", "powershell"]:
-                return f"Unknown shell type: {shell_type}. Type 'winshell help' for options."
 
             try:
-                self.shell_proc = subprocess.Popen(
-                    [executable],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=0,
-                    creationflags=subprocess.CREATE_NO_WINDOW
-                )
-                self.shell_type = shell_type
-                threading.Thread(target=self._shell_reader, daemon=True).start()
-                return f"Switched to {shell_type}. Type 'exit' to return to PyOS."
+                return self._launch_shell(shell_type)
             except Exception as e:
                 return f"Failed to launch {shell_type}: {e}"
 
         return f"Unknown command: {cmd}. Type help for a list of commands."
-

@@ -3,9 +3,17 @@ import threading
 import json
 import os
 import time
+import platform
+import shutil
 import numpy as np
-import soundfile as sf
 import audio_devices
+
+try:
+    import soundfile as sf
+    HAS_SOUNDFILE = True
+except ImportError:
+    sf = None
+    HAS_SOUNDFILE = False
 
 try:
     import sounddevice as sd
@@ -13,10 +21,18 @@ try:
 except ImportError:
     HAS_SOUNDDEVICE = False
 
+try:
+    import winsound
+except ImportError:
+    winsound = None
+
 class SoundManager:
     def __init__(self, data_dir):
         # Normalize the path initially
         self.data_dir = os.path.normpath(data_dir)
+        self.platform_name = platform.system()
+        self.ffplay_path = shutil.which("ffplay")
+        self.afplay_path = shutil.which("afplay") if self.platform_name == "Darwin" else None
         print(f"Normalized data_dir: {repr(self.data_dir)}")
 
         # Paths for configuration and custom themes
@@ -141,12 +157,18 @@ class SoundManager:
 
     def _play_notes(self, notes):
         """Play a sequence of notes using ffplay and lavfi."""
-        # Use ffplay for tones for reliability across devices.
+        if self._play_notes_with_sounddevice(notes):
+            return
+        if self._play_notes_with_winsound(notes):
+            return
         self._play_notes_ffplay(notes)
 
     def _play_notes_sync(self, notes):
         """Play notes synchronously."""
-        # Use ffplay for tones for reliability across devices.
+        if self._play_notes_with_sounddevice(notes):
+            return
+        if self._play_notes_with_winsound(notes):
+            return
         self._play_notes_ffplay(notes)
 
     def _build_notes_filter(self, notes):
@@ -169,11 +191,7 @@ class SoundManager:
             if self._play_file_with_sounddevice(path):
                 return
             try:
-                # Use forward slashes for ffmpeg and escape for filter string
-                clean_path = path.replace(os.sep, '/')
-                # Add a small amount of silence at the end to prevent truncation
-                subprocess.run(["ffplay", "-nodisp", "-autoexit", "-af", "apad=pad_dur=0.3", clean_path], 
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self._play_file_with_system_player(path)
             except Exception as e:
                 print(f"Error playing file: {e}")
 
@@ -182,11 +200,40 @@ class SoundManager:
             if self._play_file_with_sounddevice(path):
                 return
             try:
-                clean_path = path.replace(os.sep, '/')
-                subprocess.run(["ffplay", "-nodisp", "-autoexit", "-af", "apad=pad_dur=0.3", clean_path], 
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self._play_file_with_system_player(path)
             except Exception as e:
                 print(f"Error playing file sync: {e}")
+
+    def _play_file_with_system_player(self, path):
+        if self._play_file_with_winsound(path):
+            return
+        if self.afplay_path:
+            subprocess.run(
+                [self.afplay_path, path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return
+        if self.ffplay_path:
+            clean_path = path.replace(os.sep, "/")
+            subprocess.run(
+                [self.ffplay_path, "-nodisp", "-autoexit", "-af", "apad=pad_dur=0.3", clean_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return
+        raise RuntimeError("No system audio player is available.")
+
+    def _play_file_with_winsound(self, path):
+        if winsound is None:
+            return False
+        if not path.lower().endswith(".wav"):
+            return False
+        try:
+            winsound.PlaySound(path, winsound.SND_FILENAME)
+            return True
+        except Exception:
+            return False
 
     def _selected_output_device_index(self):
         config = audio_devices.load_device_config(self.data_dir)
@@ -216,8 +263,18 @@ class SoundManager:
             print(f"Sounddevice notes playback failed, falling back to ffplay: {e}")
             return False
 
+    def _play_notes_with_winsound(self, notes):
+        if winsound is None or not notes:
+            return False
+        try:
+            for freq, dur in notes:
+                winsound.Beep(int(freq), max(int(dur), 1))
+            return True
+        except Exception:
+            return False
+
     def _play_file_with_sounddevice(self, path):
-        if not HAS_SOUNDDEVICE:
+        if not HAS_SOUNDDEVICE or not HAS_SOUNDFILE:
             return False
         try:
             audio, sample_rate = self._get_cached_audio(path)
@@ -231,6 +288,8 @@ class SoundManager:
             return False
 
     def _get_cached_audio(self, path):
+        if not HAS_SOUNDFILE:
+            raise RuntimeError("soundfile is not installed")
         abs_path = os.path.abspath(path)
         mtime = os.path.getmtime(abs_path)
         cached = self._audio_cache.get(abs_path)
@@ -246,9 +305,9 @@ class SoundManager:
 
     def _play_notes_ffplay(self, notes):
         filter_str = self._build_notes_filter(notes)
-        if filter_str:
+        if filter_str and self.ffplay_path:
             try:
-                subprocess.run(["ffplay", "-nodisp", "-autoexit", "-f", "lavfi", filter_str],
+                subprocess.run([self.ffplay_path, "-nodisp", "-autoexit", "-f", "lavfi", filter_str],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception as e:
                 print(f"Error playing notes: {e}")

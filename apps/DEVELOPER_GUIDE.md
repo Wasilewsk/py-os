@@ -36,7 +36,7 @@ class MyApp(BlindApp):
 | :--- | :--- |
 | `speak(text, interrupt=True)` | Speaks text via the system's speech engine. |
 | `play_sound(sound_type)` | Plays a themed sound (`nav`, `launch`, `close`, `alert`, `startup`, etc.). |
-| `get_data_path(filename)` | Returns a path to a file in the user's `.py-os` data directory. |
+| `get_data_path(filename)` | Returns a path to a file in py-os's data directory. |
 | `get_vfs()` | Returns the Virtual File System kernel. **Note:** For direct host file system access, use the `os` module. |
 | `notify(title: str, message: str, level: str = 'info')` | Sends a notification to the user. Currently supports spoken notifications. `level` can be 'info', 'warning', or 'error'. |
 

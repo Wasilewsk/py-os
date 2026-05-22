@@ -7,13 +7,14 @@ import sounds
 import threading
 import traceback
 from api import SystemAPI
+from app_paths import get_data_dir
 
 class DesktopFrame(wx.Frame):
     def __init__(self):
         super().__init__(None, title="PyOS Desktop", size=(800, 600))
         
         # Core OS path
-        self.data_dir = os.path.join(os.path.expanduser("~"), ".py-os")
+        self.data_dir = get_data_dir()
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
             
@@ -81,8 +82,9 @@ class DesktopFrame(wx.Frame):
         self.api.speak(msg)
 
     def greet(self):
-        msg = "Welcome to PyOS. Use Tab to navigate through apps, and press Enter to launch."
-        self.api.speak(msg)
+        if not getattr(self.api.engine, "prefers_native_screen_reader", False):
+            msg = "Welcome to PyOS. Use Tab to navigate through apps, and press Enter to launch."
+            self.api.speak(msg)
         if self.app_buttons:
             self.app_buttons[0].SetFocus()
 
@@ -127,6 +129,9 @@ class DesktopFrame(wx.Frame):
             btn.SetFont(wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_MEDIUM))
             btn.SetBackgroundColour(wx.Colour(40, 40, 40))
             btn.SetForegroundColour(wx.Colour(255, 255, 255))
+            btn.SetName(app.name)
+            btn.SetToolTip(app.description)
+            btn.SetHelpText(app.description)
             
             btn.Bind(wx.EVT_BUTTON, lambda evt, a=app: self.on_launch_app(a))
             btn.Bind(wx.EVT_SET_FOCUS, lambda evt, a=app: self.on_item_focused(a))
@@ -141,7 +146,8 @@ class DesktopFrame(wx.Frame):
         try:
             if self.IsActive():
                 self.api.play_sound("nav")
-                self.api.speak(f"{app.name}: {app.description}")
+                if not getattr(self.api.engine, "prefers_native_screen_reader", False):
+                    self.api.speak(f"{app.name}: {app.description}")
         except Exception as e:
             print(f"Error in focus speech: {e}")
 
