@@ -51,21 +51,27 @@ class SoundManager:
                 "nav": [(600, 50)],
                 "launch": [(440, 100), (880, 100)],
                 "close": [(880, 100), (440, 100)],
-                "alert": [(1000, 200), (800, 200)]
+                "alert": [(1000, 200), (800, 200)],
+                "alarm": [(1000, 200), (800, 200)],
+                "timer": [(1000, 200), (800, 200)],
             },
             "Retro": {
                 "startup": [(100, 100), (200, 100), (300, 100)],
                 "nav": [(150, 30)],
                 "launch": [(200, 50), (400, 50), (600, 50)],
                 "close": [(600, 50), (400, 50), (200, 50)],
-                "alert": [(400, 100), (400, 100), (400, 100)]
+                "alert": [(400, 100), (400, 100), (400, 100)],
+                "alarm": [(400, 100), (400, 100), (400, 100)],
+                "timer": [(400, 100), (400, 100), (400, 100)],
             },
             "Classic": {
                 "startup": [(523, 400)],
                 "nav": [(400, 20)],
                 "launch": [(523, 100)],
                 "close": [(261, 100)],
-                "alert": [(1000, 500)]
+                "alert": [(1000, 500)],
+                "alarm": [(1000, 500)],
+                "timer": [(1000, 500)],
             }
         }
         self.themes = self.default_themes.copy()
@@ -148,7 +154,15 @@ class SoundManager:
             self.current_theme = "Modern"
 
         theme_data = self.themes.get(self.current_theme, self.themes["Modern"])
+        fallback_map = {
+            "timer": "alert",
+            "alarm": "alert",
+        }
         data = theme_data.get(sound_type)
+        if not data and sound_type in fallback_map:
+            data = theme_data.get(fallback_map[sound_type])
+        if not data and sound_type in fallback_map:
+            data = self.themes["Modern"].get(sound_type) or self.themes["Modern"].get(fallback_map[sound_type])
         if not data: return
 
         if self.platform_name == "Windows" and winsound is not None and not isinstance(data, str):

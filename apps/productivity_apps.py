@@ -46,7 +46,7 @@ class TimerApp(BlindApp):
     def run_timer(self, seconds):
         time.sleep(seconds)
         self.api.speak("Timer finished!")
-        self.api.play_sound("alert")
+        self.api.play_sound("timer")
         wx.CallAfter(self.on_close)
 
 class RemindersApp(BlindApp):
