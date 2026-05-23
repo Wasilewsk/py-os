@@ -12,6 +12,7 @@ class TimerApp(BlindApp):
         self.description = "Set a simple countdown timer."
         self.help_text = "Enter seconds and press Enter. The app will alert you when done."
         self.docs = "Timer runs in the background and plays an alarm after the specified duration."
+        self.auto_closing_after_finish = False
 
     def run(self):
         self.frame = wx.Frame(None, title="Timer", size=(300, 200))
@@ -45,9 +46,22 @@ class TimerApp(BlindApp):
 
     def run_timer(self, seconds):
         time.sleep(seconds)
+        wx.CallAfter(self._finish_timer)
+
+    def _finish_timer(self):
         self.api.speak("Timer finished!")
         self.api.play_sound("timer")
-        wx.CallAfter(self.on_close)
+        self.auto_closing_after_finish = True
+        wx.CallLater(1200, lambda: self.on_close(play_close_sound=False))
+
+    def on_close(self, event=None, play_close_sound=True):
+        if self.frame:
+            self.frame.Destroy()
+            self.frame = None
+        if play_close_sound:
+            self.api.sounds.play("close")
+        self.api.desktop.on_app_closed(self)
+        self.auto_closing_after_finish = False
 
 class RemindersApp(BlindApp):
     def __init__(self, api):
