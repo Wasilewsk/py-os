@@ -5,6 +5,8 @@ import os
 import time
 import platform
 import shutil
+import io
+import wave
 import numpy as np
 import audio_devices
 
@@ -161,6 +163,8 @@ class SoundManager:
 
     def _play_notes(self, notes):
         """Play a sequence of notes using ffplay and lavfi."""
+        if self._play_notes_with_winsound_audio(notes):
+            return
         if self._play_notes_with_sounddevice(notes):
             return
         if self._play_notes_with_winsound(notes):
@@ -169,6 +173,8 @@ class SoundManager:
 
     def _play_notes_sync(self, notes):
         """Play notes synchronously."""
+        if self._play_notes_with_winsound_audio(notes):
+            return
         if self._play_notes_with_sounddevice(notes):
             return
         if self._play_notes_with_winsound(notes):
@@ -273,6 +279,42 @@ class SoundManager:
         try:
             for freq, dur in notes:
                 winsound.Beep(int(freq), max(int(dur), 1))
+            return True
+        except Exception:
+            return False
+
+    def _play_notes_with_winsound_audio(self, notes):
+        if winsound is None or not notes:
+            return False
+        try:
+            sample_rate = 44100
+            parts = []
+            for freq, dur in notes:
+                duration_seconds = max(int(dur), 1) / 1000.0
+                frame_count = max(int(sample_rate * duration_seconds), 1)
+                if int(freq) <= 0:
+                    wave_data = np.zeros(frame_count, dtype=np.float32)
+                else:
+                    t = np.linspace(0, duration_seconds, frame_count, endpoint=False, dtype=np.float32)
+                    wave_data = 0.20 * np.sin(2 * np.pi * float(freq) * t)
+                parts.append(wave_data)
+
+            audio = np.concatenate(parts) if parts else np.array([], dtype=np.float32)
+            if audio.size == 0:
+                return False
+
+            pcm = np.clip(audio * 32767, -32768, 32767).astype(np.int16)
+            buffer = io.BytesIO()
+            with wave.open(buffer, "wb") as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(sample_rate)
+                wav_file.writeframes(pcm.tobytes())
+
+            winsound.PlaySound(
+                buffer.getvalue(),
+                winsound.SND_MEMORY | winsound.SND_SYNC,
+            )
             return True
         except Exception:
             return False
