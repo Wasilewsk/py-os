@@ -7,6 +7,7 @@ import platform
 import shutil
 import io
 import wave
+import hashlib
 import numpy as np
 import audio_devices
 
@@ -35,6 +36,7 @@ class SoundManager:
         self.platform_name = platform.system()
         self.ffplay_path = shutil.which("ffplay")
         self.afplay_path = shutil.which("afplay") if self.platform_name == "Darwin" else None
+        self.generated_tones_dir = os.path.join(self.data_dir, "generated_tones")
         print(f"Normalized data_dir: {repr(self.data_dir)}")
 
         # Paths for configuration and custom themes
@@ -148,6 +150,10 @@ class SoundManager:
         theme_data = self.themes.get(self.current_theme, self.themes["Modern"])
         data = theme_data.get(sound_type)
         if not data: return
+
+        if self.platform_name == "Windows" and winsound is not None and not isinstance(data, str):
+            if self._play_notes_with_winsound_file(data, async_play=sound_type != "startup"):
+                return
 
         # Startup sound is synchronous
         if sound_type == "startup":
@@ -315,6 +321,52 @@ class SoundManager:
                 buffer.getvalue(),
                 winsound.SND_MEMORY | winsound.SND_SYNC,
             )
+            return True
+        except Exception:
+            return False
+
+    def _render_notes_to_pcm(self, notes, sample_rate=44100):
+        parts = []
+        for freq, dur in notes:
+            duration_seconds = max(int(dur), 1) / 1000.0
+            frame_count = max(int(sample_rate * duration_seconds), 1)
+            if int(freq) <= 0:
+                wave_data = np.zeros(frame_count, dtype=np.float32)
+            else:
+                t = np.linspace(0, duration_seconds, frame_count, endpoint=False, dtype=np.float32)
+                wave_data = 0.20 * np.sin(2 * np.pi * float(freq) * t)
+            parts.append(wave_data)
+        audio = np.concatenate(parts) if parts else np.array([], dtype=np.float32)
+        return np.clip(audio * 32767, -32768, 32767).astype(np.int16), sample_rate
+
+    def _get_or_create_tone_file(self, notes):
+        if not notes:
+            return None
+        os.makedirs(self.generated_tones_dir, exist_ok=True)
+        notes_key = json.dumps(notes, separators=(",", ":"), ensure_ascii=True)
+        file_hash = hashlib.sha1(notes_key.encode("utf-8")).hexdigest()
+        wav_path = os.path.join(self.generated_tones_dir, f"{file_hash}.wav")
+        if os.path.exists(wav_path):
+            return wav_path
+
+        pcm, sample_rate = self._render_notes_to_pcm(notes)
+        with wave.open(wav_path, "wb") as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(pcm.tobytes())
+        return wav_path
+
+    def _play_notes_with_winsound_file(self, notes, async_play):
+        if winsound is None or not notes:
+            return False
+        try:
+            wav_path = self._get_or_create_tone_file(notes)
+            if not wav_path:
+                return False
+            flags = winsound.SND_FILENAME | winsound.SND_NODEFAULT
+            flags |= winsound.SND_ASYNC if async_play else winsound.SND_SYNC
+            winsound.PlaySound(wav_path, flags)
             return True
         except Exception:
             return False
