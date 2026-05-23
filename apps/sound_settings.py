@@ -1,272 +1,312 @@
-import wx
+import copy
 import os
+
+import wx
+
 from api import BlindApp
+
 
 class ThemeCreatorApp(BlindApp):
     def __init__(self, api):
         super().__init__(api)
         self.name = "Theme Creator"
-        self.description = "Create your own sound theme."
-        self.docs = "Theme Creator allows you to define custom tones or sound file paths for system events like startup, navigation, alerts, launch, close, alarms, and timers." 
-        self.frame = None
-        self.label = None
-        self.theme_name_input = None
-        self.mode_choice = None
-        self.freq_input = None
-        self.duration_input = None
-        self.file_path_input = None
-        self.browse_btn = None
-        self.btn = None
-        self.step = "theme_name"
-        self.current_event_index = 0
+        self.description = "Create a new sound theme or open an existing one to edit."
+        self.help_text = "Choose Create New Theme or Open Theme. In the editor, select a sound name, browse for a file, and save."
+        self.docs = (
+            "Theme Creator lets you create and edit themes for the existing sound slots: "
+            "startup, nav, alert, launch, close, alarm, and timer."
+        )
         self.events = ["startup", "nav", "alert", "launch", "close", "alarm", "timer"]
-        self.new_theme = {}
         self.theme_name = ""
-        self.current_event = ""
-        self.sound_choice_mode = "tones"
+        self.theme_data = {}
+        self.is_new_theme = False
+
+        self.title_label = None
+        self.subtitle_label = None
+        self.theme_name_input = None
+        self.sound_list = None
+        self.assignment_display = None
+        self.browse_button = None
+        self.save_button = None
 
     def run(self):
-        self.step = "theme_name"
-        self.current_event_index = 0
-        self.new_theme = {}
         self.theme_name = ""
-        self.current_event = ""
-        self.sound_choice_mode = "tones"
+        self.theme_data = {}
+        self.is_new_theme = False
+        self._show_launcher()
 
-        self.frame = wx.Frame(None, title="Theme Creator", size=(520, 430))
+    def _discard_active_frame(self):
+        if self.frame:
+            try:
+                self.frame.Unbind(wx.EVT_CLOSE)
+            except Exception:
+                pass
+            active = self.frame
+            self.frame = None
+            active.Destroy()
+
+    def _base_panel(self, title, subtitle, size=(560, 460)):
+        self._discard_active_frame()
+        self.frame = wx.Frame(None, title=title, size=size)
         panel = wx.Panel(self.frame)
         panel.SetBackgroundColour(wx.Colour(0, 0, 0))
         sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.label = wx.StaticText(panel, label="Enter name for new theme:")
-        self.label.SetForegroundColour(wx.Colour(255, 255, 255))
-        self.label.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-        sizer.Add(self.label, 0, wx.ALL | wx.CENTER, 10)
+        self.title_label = wx.StaticText(panel, label=title)
+        self.title_label.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.title_label.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        sizer.Add(self.title_label, 0, wx.ALL | wx.CENTER, 14)
+
+        self.subtitle_label = wx.StaticText(panel, label=subtitle)
+        self.subtitle_label.SetForegroundColour(wx.Colour(210, 210, 210))
+        self.subtitle_label.Wrap(500)
+        sizer.Add(self.subtitle_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
+
+        panel.SetSizer(sizer)
+        self.frame.Bind(wx.EVT_CLOSE, self.on_close)
+        return panel, sizer
+
+    def _show_launcher(self):
+        panel, sizer = self._base_panel(
+            "Theme Creator",
+            "Choose whether to create a new theme or open an existing theme to edit.",
+            size=(520, 260),
+        )
+
+        create_button = wx.Button(panel, label="Create New Theme")
+        open_button = wx.Button(panel, label="Open Theme")
+
+        create_button.SetBackgroundColour(wx.Colour(30, 90, 30))
+        create_button.SetForegroundColour(wx.Colour(255, 255, 255))
+        open_button.SetBackgroundColour(wx.Colour(40, 40, 90))
+        open_button.SetForegroundColour(wx.Colour(255, 255, 255))
+
+        sizer.Add(create_button, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 16)
+        sizer.Add(open_button, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 16)
+
+        create_button.Bind(wx.EVT_BUTTON, self.on_create_new_theme)
+        open_button.Bind(wx.EVT_BUTTON, self.on_open_theme)
+
+        self.frame.Show()
+        create_button.SetFocus()
+        self.api.speak("Theme Creator opened. Choose Create New Theme or Open Theme.")
+
+    def on_create_new_theme(self, event=None):
+        self.is_new_theme = True
+        self.theme_name = ""
+        self.theme_data = {}
+        self._show_theme_name_screen()
+
+    def _show_theme_name_screen(self):
+        panel, sizer = self._base_panel(
+            "Theme Creator",
+            "Enter name for new theme:",
+            size=(520, 240),
+        )
 
         self.theme_name_input = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
         self.theme_name_input.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        sizer.Add(self.theme_name_input, 0, wx.EXPAND | wx.ALL, 10)
+        next_button = wx.Button(panel, label="Next")
 
-        self.mode_choice = wx.Choice(panel, choices=["Tones", "Audio File"])
-        self.mode_choice.SetSelection(0)
-        self.mode_choice.Hide()
-        sizer.Add(self.mode_choice, 0, wx.EXPAND | wx.ALL, 10)
+        sizer.Add(self.theme_name_input, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
+        sizer.Add(next_button, 0, wx.ALIGN_CENTER | wx.BOTTOM, 12)
 
-        self.freq_input = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
-        self.freq_input.SetHint("Frequencies, e.g. 440, 660, 0")
-        self.freq_input.Hide()
-        sizer.Add(self.freq_input, 0, wx.EXPAND | wx.ALL, 8)
-
-        self.duration_input = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
-        self.duration_input.SetHint("Durations ms, e.g. 200, 300, 500")
-        self.duration_input.Hide()
-        sizer.Add(self.duration_input, 0, wx.EXPAND | wx.ALL, 8)
-
-        file_row = wx.BoxSizer(wx.HORIZONTAL)
-        self.file_path_input = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
-        self.file_path_input.SetHint("Type file path or click Browse")
-        self.file_path_input.Hide()
-        file_row.Add(self.file_path_input, 1, wx.EXPAND | wx.RIGHT, 8)
-        self.browse_btn = wx.Button(panel, label="Browse...")
-        self.browse_btn.Hide()
-        file_row.Add(self.browse_btn, 0)
-        sizer.Add(file_row, 0, wx.EXPAND | wx.ALL, 8)
-
-        self.btn = wx.Button(panel, label="Next")
-        sizer.Add(self.btn, 0, wx.ALL | wx.CENTER, 10)
-        panel.SetSizer(sizer)
-
-        self.btn.Bind(wx.EVT_BUTTON, self.on_next)
-        self.theme_name_input.Bind(wx.EVT_TEXT_ENTER, self.on_next)
-        self.freq_input.Bind(wx.EVT_TEXT_ENTER, self.on_next)
-        self.duration_input.Bind(wx.EVT_TEXT_ENTER, self.on_next)
-        self.file_path_input.Bind(wx.EVT_TEXT_ENTER, self.on_next)
-        self.browse_btn.Bind(wx.EVT_BUTTON, self.on_browse_file)
-        self.mode_choice.Bind(wx.EVT_CHOICE, self.on_mode_changed)
-        self.frame.Bind(wx.EVT_CHAR_HOOK, self.on_key_press)
-        self.frame.Bind(wx.EVT_CLOSE, self.on_close)
+        self.theme_name_input.Bind(wx.EVT_TEXT_ENTER, self.on_confirm_theme_name)
+        next_button.Bind(wx.EVT_BUTTON, self.on_confirm_theme_name)
 
         self.frame.Show()
-        self.api.speak("Theme Creator opened. Enter a name for your theme.")
-        self.set_step_ui("theme_name")
+        self.theme_name_input.SetFocus()
+        self.api.speak("Enter a name for your new theme, then press Next.")
 
-    def on_key_press(self, event):
-        keycode = event.GetKeyCode()
-        if keycode in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
-            self.on_next()
-            return
-        event.Skip()
-
-    def on_mode_changed(self, event):
-        selected = self.mode_choice.GetStringSelection().lower()
-        self.sound_choice_mode = "tones" if selected == "tones" else "file"
-        if self.step == "event":
-            self.update_event_inputs()
-
-    def update_event_inputs(self):
-        if self.sound_choice_mode == "tones":
-            self.freq_input.Show()
-            self.duration_input.Show()
-            self.file_path_input.Hide()
-            self.browse_btn.Hide()
-            if not self.freq_input.HasFocus() and not self.duration_input.HasFocus():
-                self.freq_input.SetFocus()
-            self.api.speak("Tone mode. Enter frequencies then durations.")
-        else:
-            self.freq_input.Hide()
-            self.duration_input.Hide()
-            self.file_path_input.Show()
-            self.browse_btn.Show()
-            if not self.file_path_input.HasFocus():
-                self.file_path_input.SetFocus()
-            self.api.speak("File mode. Type a path or browse.")
-        self.frame.Layout()
-
-    def set_step_ui(self, step):
-        self.step = step
-        self.theme_name_input.Hide()
-        self.mode_choice.Hide()
-        self.freq_input.Hide()
-        self.duration_input.Hide()
-        self.file_path_input.Hide()
-        self.browse_btn.Hide()
-
-        if step == "theme_name":
-            self.label.SetLabel("Enter name for new theme:")
-            self.theme_name_input.Show()
+    def on_confirm_theme_name(self, event=None):
+        proposed_name = self.theme_name_input.GetValue().strip()
+        if not proposed_name:
+            self.api.speak("Theme name is required.")
             self.theme_name_input.SetFocus()
-            self.api.speak("Enter a name for your theme, then press Next.")
-        elif step == "event":
-            self.label.SetLabel(f"{self.current_event.capitalize()}: choose source and enter values.")
-            self.mode_choice.Show()
-            self.mode_choice.SetFocus()
-            self.update_event_inputs()
-
-        self.frame.Layout()
-
-    def on_next(self, event=None):
-        if self.step == "theme_name":
-            val = self.theme_name_input.GetValue().strip()
-            if not val:
-                self.api.speak("Theme name is required.")
-                self.theme_name_input.SetFocus()
-                return
-            self.theme_name_input.Clear()
-            self.theme_name = val
-            self.current_event = self.events[self.current_event_index]
-            self.set_step_ui("event")
+            return
+        if any(char in proposed_name for char in ("/", "\\")):
+            self.api.speak("Theme name cannot contain slashes.")
+            self.theme_name_input.SetFocus()
+            return
+        if proposed_name in self.api.sounds.themes:
+            self.api.speak("That theme already exists. Use Open Theme to edit it, or choose a different name.")
+            self.theme_name_input.SetFocus()
             return
 
-        if self.step == "event":
-            selected = self.mode_choice.GetStringSelection().lower() or "tones"
-            self.sound_choice_mode = "tones" if selected == "tones" else "file"
-            if self.sound_choice_mode == "tones":
-                try:
-                    tones = self.parse_tone_input(
-                        self.freq_input.GetValue().strip(),
-                        self.duration_input.GetValue().strip()
-                    )
-                    self.new_theme[self.current_event] = tones
-                    self.freq_input.Clear()
-                    self.duration_input.Clear()
-                    self.api.speak(f"{self.current_event.capitalize()} tone set.")
-                    self.advance_to_next_event()
-                except ValueError as e:
-                    self.api.speak(f"Invalid tone input: {e}")
-                    self.freq_input.SetFocus()
+        self.theme_name = proposed_name
+        self.theme_data = {}
+        self._show_theme_editor()
+
+    def on_open_theme(self, event=None):
+        theme_names = sorted(self.api.sounds.get_available_themes(), key=str.lower)
+        if not theme_names:
+            self.api.speak("There are no themes to open.")
+            return
+
+        dialog = wx.SingleChoiceDialog(
+            self.frame,
+            "Choose a theme to edit.",
+            "Open Theme",
+            theme_names,
+        )
+        try:
+            if dialog.ShowModal() != wx.ID_OK:
+                self.api.speak("Open Theme cancelled.")
                 return
-            path = self.file_path_input.GetValue().strip()
-            if not path:
-                self.api.speak("File path is required, or use Browse.")
-                self.file_path_input.SetFocus()
+            selected = dialog.GetStringSelection()
+        finally:
+            dialog.Destroy()
+
+        self.is_new_theme = False
+        self.theme_name = selected
+        self.theme_data = copy.deepcopy(self.api.sounds.themes.get(selected, {}))
+        self._show_theme_editor()
+
+    def _show_theme_editor(self):
+        panel, sizer = self._base_panel(
+            "Theme Creator",
+            f"Theme name: {self.theme_name}",
+            size=(640, 520),
+        )
+
+        list_label = wx.StaticText(panel, label="Theme sounds:")
+        list_label.SetForegroundColour(wx.Colour(255, 255, 255))
+        sizer.Add(list_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self.sound_list = wx.ListBox(panel, choices=self.events, style=wx.LB_SINGLE)
+        self.sound_list.SetBackgroundColour(wx.Colour(20, 20, 20))
+        self.sound_list.SetForegroundColour(wx.Colour(255, 255, 255))
+        sizer.Add(self.sound_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
+
+        current_label = wx.StaticText(panel, label="Current sound assignment:")
+        current_label.SetForegroundColour(wx.Colour(255, 255, 255))
+        sizer.Add(current_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self.assignment_display = wx.TextCtrl(
+            panel,
+            style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2,
+        )
+        self.assignment_display.SetBackgroundColour(wx.Colour(25, 25, 25))
+        self.assignment_display.SetForegroundColour(wx.Colour(220, 220, 220))
+        self.assignment_display.SetMinSize((-1, 110))
+        sizer.Add(self.assignment_display, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
+
+        button_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.browse_button = wx.Button(panel, label="Browse...")
+        self.save_button = wx.Button(panel, label="Save Theme")
+        self.browse_button.SetBackgroundColour(wx.Colour(40, 40, 90))
+        self.browse_button.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.save_button.SetBackgroundColour(wx.Colour(0, 100, 0))
+        self.save_button.SetForegroundColour(wx.Colour(255, 255, 255))
+
+        button_row.Add(self.browse_button, 0, wx.RIGHT, 10)
+        button_row.AddStretchSpacer(1)
+        button_row.Add(self.save_button, 0)
+        sizer.Add(button_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
+
+        self.sound_list.Bind(wx.EVT_LISTBOX, self.on_sound_selected)
+        self.sound_list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_browse_file)
+        self.browse_button.Bind(wx.EVT_BUTTON, self.on_browse_file)
+        self.save_button.Bind(wx.EVT_BUTTON, self.on_save_theme)
+
+        self.frame.Show()
+        if self.events:
+            self.sound_list.SetSelection(0)
+            self._refresh_assignment_display()
+        self.sound_list.SetFocus()
+        self.api.speak(
+            f"Editing theme {self.theme_name}. Select a sound name, browse for an audio file, then save the theme."
+        )
+
+    def on_sound_selected(self, event=None):
+        self._refresh_assignment_display()
+        sound_name = self.get_selected_event()
+        if sound_name:
+            self.api.speak(f"{sound_name} selected. {self._assignment_summary(sound_name)}")
+
+    def get_selected_event(self):
+        if not self.sound_list:
+            return None
+        selection = self.sound_list.GetSelection()
+        if selection == wx.NOT_FOUND:
+            return None
+        return self.sound_list.GetString(selection)
+
+    def _assignment_summary(self, event_name):
+        value = self.theme_data.get(event_name)
+        if isinstance(value, str) and value:
+            return f"Assigned to file {os.path.basename(value)}."
+        if isinstance(value, list) and value:
+            return "Currently using a saved tone sequence."
+        return "No sound assigned yet."
+
+    def _format_assignment(self, event_name):
+        value = self.theme_data.get(event_name)
+        if isinstance(value, str) and value:
+            return f"Sound: {event_name}\nType: Audio file\nPath: {value}"
+        if isinstance(value, list) and value:
+            return f"Sound: {event_name}\nType: Tone sequence\nValue: {value}"
+        return f"Sound: {event_name}\nType: Not assigned"
+
+    def _refresh_assignment_display(self):
+        event_name = self.get_selected_event()
+        if not event_name:
+            self.assignment_display.SetValue("Select a sound name first.")
+            return
+        self.assignment_display.SetValue(self._format_assignment(event_name))
+
+    def on_browse_file(self, event=None):
+        event_name = self.get_selected_event()
+        if not event_name:
+            self.api.speak("Select a sound name before browsing for a file.")
+            return
+
+        wildcard = (
+            "Audio files (*.wav;*.mp3;*.ogg;*.flac)|*.wav;*.mp3;*.ogg;*.flac|"
+            "WAV files (*.wav)|*.wav|MP3 files (*.mp3)|*.mp3|"
+            "OGG files (*.ogg)|*.ogg|FLAC files (*.flac)|*.flac"
+        )
+        dialog = wx.FileDialog(
+            self.frame,
+            f"Choose audio file for {event_name}",
+            wildcard=wildcard,
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        )
+        try:
+            if dialog.ShowModal() != wx.ID_OK:
+                self.api.speak("Browse cancelled.")
                 return
-            if not os.path.exists(path):
-                self.api.speak("File path not found. Please enter a valid audio file path.")
-                self.file_path_input.SetFocus()
-                return
-            self.new_theme[self.current_event] = path
-            self.file_path_input.Clear()
-            self.api.speak(f"{self.current_event.capitalize()} sound set to file.")
-            self.advance_to_next_event()
+            selected_path = dialog.GetPath()
+        finally:
+            dialog.Destroy()
 
-    def parse_int_list(self, raw_text, field_name):
-        parts = [p.strip() for p in raw_text.split(",")]
-        if not parts or any(p == "" for p in parts):
-            raise ValueError(f"{field_name} must be comma-separated values")
-        values = []
-        for part in parts:
-            try:
-                values.append(int(part))
-            except ValueError:
-                raise ValueError(f"{field_name} must contain only whole numbers")
-        return values
+        self.theme_data[event_name] = selected_path
+        self._refresh_assignment_display()
+        self.api.speak(f"{event_name} set to {os.path.basename(selected_path)}.")
 
-    def validate_tone_safety(self, freq, duration):
-        if freq >= 8000 and duration > 120:
-            raise ValueError("frequencies 8000 Hz or higher must be 120 ms or less")
-        if freq >= 4000 and duration > 300:
-            raise ValueError("frequencies 4000 Hz or higher must be 300 ms or less")
+    def _validate_theme_before_save(self):
+        missing_events = []
+        for event_name in self.events:
+            value = self.theme_data.get(event_name)
+            if not value:
+                missing_events.append(event_name)
+                continue
+            if isinstance(value, str) and not os.path.exists(value):
+                raise ValueError(f"The file for {event_name} does not exist anymore.")
+        if missing_events:
+            missing_text = ", ".join(missing_events)
+            raise ValueError(f"Assign a sound file for each sound before saving. Missing: {missing_text}.")
 
-    def parse_tone_input(self, freq_text, duration_text):
-        freqs = self.parse_int_list(freq_text, "Frequencies")
-        durs = self.parse_int_list(duration_text, "Durations")
-        if len(freqs) != len(durs):
-            raise ValueError("frequencies and durations must have the same number of items")
+    def on_save_theme(self, event=None):
+        try:
+            self._validate_theme_before_save()
+        except ValueError as error:
+            self.api.speak(str(error))
+            return
 
-        tones = []
-        for freq, duration in zip(freqs, durs):
-            if freq < 0:
-                raise ValueError("frequency cannot be negative; use 0 for silence")
-            if duration <= 0:
-                raise ValueError("duration must be greater than zero")
-            if freq > 0:
-                self.validate_tone_safety(freq, duration)
-            tones.append((freq, duration))
-        return tones
-
-    def on_browse_file(self, event):
-        wildcard = "Audio files (*.wav;*.mp3;*.ogg;*.flac)|*.wav;*.mp3;*.ogg;*.flac|WAV files (*.wav)|*.wav|MP3 files (*.mp3)|*.mp3|OGG files (*.ogg)|*.ogg|FLAC files (*.flac)|*.flac"
-        dlg = wx.FileDialog(self.frame, "Choose an audio file", wildcard=wildcard, style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
-        if dlg.ShowModal() == wx.ID_OK:
-            self.file_path_input.SetValue(dlg.GetPath())
-            self.api.speak("File selected.")
-        dlg.Destroy()
-
-    def advance_to_next_event(self):
-        self.current_event_index += 1
-        if self.current_event_index < len(self.events):
-            self.current_event = self.events[self.current_event_index]
-            self.set_step_ui("event")
-        else:
-            self.finalize_theme()
-
-    def finalize_theme(self):
-        # Set default tones for launch/close if they weren't configured interactively
-        # These are hardcoded defaults, could be made configurable in a more robust app.
-        if "launch" not in self.new_theme or not self.new_theme["launch"]:
-             self.new_theme["launch"] = [(800, 100)]
-        if "close" not in self.new_theme or not self.new_theme["close"]:
-             self.new_theme["close"] = [(400, 100)]
-
-        if self.theme_name and self.new_theme:
-            # Add the new theme to the in-memory themes dictionary
-            self.api.sounds.themes[self.theme_name] = self.new_theme
-            
-            # To make this theme persistent, we need to save it to user_themes.json.
-            # Call the newly implemented save_custom_themes method.
-            self.api.sounds.save_custom_themes() 
-
-            # Apply the new theme immediately as the current theme
-            self.api.sounds.save_theme_name(self.theme_name)
-            self.api.speak(f"Theme {self.theme_name} created and applied!")
-        else:
-            self.api.speak("Theme creation failed. Please ensure all required inputs were provided.")
-            
+        self.api.sounds.themes[self.theme_name] = copy.deepcopy(self.theme_data)
+        self.api.sounds.save_custom_themes()
+        self.api.sounds.save_theme_name(self.theme_name)
+        self.api.sounds.current_theme = self.theme_name
+        self.api.speak(f"Theme {self.theme_name} saved and applied.")
         self.on_close()
-
-    def on_close(self, event=None):
-        """Cleanup and return focus to desktop."""
-        if self.frame:
-            self.frame.Destroy()
-        self.api.sounds.play("close")
-        self.api.desktop.on_app_closed(self)

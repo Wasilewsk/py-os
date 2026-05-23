@@ -100,15 +100,19 @@ class SoundManager:
             os.makedirs(self.custom_themes_dir)
 
         for theme_name, theme_data in self.themes.items():
-            if theme_name not in self.default_themes:
-                theme_dir = os.path.join(self.custom_themes_dir, theme_name)
-                os.makedirs(theme_dir, exist_ok=True)
-                theme_config_path = os.path.join(theme_dir, 'theme.json')
-                try:
-                    with open(theme_config_path, "w", encoding='utf-8') as f:
-                        json.dump(theme_data, f, indent=4)
-                except Exception as e:
-                    print(f"Error saving custom theme '{theme_name}': {e}")
+            default_theme = self.default_themes.get(theme_name)
+            should_persist = theme_name not in self.default_themes or theme_data != default_theme
+            if not should_persist:
+                continue
+
+            theme_dir = os.path.join(self.custom_themes_dir, theme_name)
+            os.makedirs(theme_dir, exist_ok=True)
+            theme_config_path = os.path.join(theme_dir, 'theme.json')
+            try:
+                with open(theme_config_path, "w", encoding='utf-8') as f:
+                    json.dump(theme_data, f, indent=4)
+            except Exception as e:
+                print(f"Error saving custom theme '{theme_name}': {e}")
 
     def load_theme_name(self):
         if not os.path.exists(self.data_dir):
