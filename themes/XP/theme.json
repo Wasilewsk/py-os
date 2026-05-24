@@ -5,5 +5,6 @@
     "close": "themes/XP/Windows XP Minimize.wav",
     "alert": "themes/XP/Windows XP Exclamation.wav",
     "alarm": "themes/XP/Windows XP Critical Stop.wav",
-    "timer": "themes/XP/Windows XP Notify.wav"
+    "timer": "themes/XP/Windows XP Notify.wav",
+    "background_music": "1996 Internet Starter Kit - Velkommen - Original Mix.wav"
 }

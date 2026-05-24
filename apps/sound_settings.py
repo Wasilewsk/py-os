@@ -11,12 +11,25 @@ class ThemeCreatorApp(BlindApp):
         super().__init__(api)
         self.name = "Theme Creator"
         self.description = "Create a new sound theme or open an existing one to edit."
-        self.help_text = "Choose Create New Theme or Open Theme. In the editor, select a sound name, browse for a file, and save."
+        self.help_text = "Choose Create New Theme or Open Theme. In the editor, select a sound or background music slot, browse for a file, and save."
         self.docs = (
             "Theme Creator lets you create and edit themes for the existing sound slots: "
-            "startup, nav, alert, launch, close, alarm, and timer."
+            "startup, nav, alert, launch, close, alarm, timer, and background music."
         )
-        self.events = ["startup", "nav", "alert", "launch", "close", "alarm", "timer"]
+        self.sound_slots = [
+            ("startup", "startup"),
+            ("nav", "nav"),
+            ("alert", "alert"),
+            ("launch", "launch"),
+            ("close", "close"),
+            ("alarm", "alarm"),
+            ("timer", "timer"),
+            ("background music", "background_music"),
+        ]
+        self.slot_labels = [label for label, _key in self.sound_slots]
+        self.slot_keys = [key for _label, key in self.sound_slots]
+        self.slot_to_label = {key: label for label, key in self.sound_slots}
+        self.label_to_slot = {label: key for label, key in self.sound_slots}
         self.theme_name = ""
         self.theme_data = {}
         self.is_new_theme = False
@@ -173,7 +186,7 @@ class ThemeCreatorApp(BlindApp):
         list_label.SetForegroundColour(wx.Colour(255, 255, 255))
         sizer.Add(list_label, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
-        self.sound_list = wx.ListBox(panel, choices=self.events, style=wx.LB_SINGLE)
+        self.sound_list = wx.ListBox(panel, choices=self.slot_labels, style=wx.LB_SINGLE)
         self.sound_list.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.sound_list.SetForegroundColour(wx.Colour(255, 255, 255))
         sizer.Add(self.sound_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
@@ -210,56 +223,59 @@ class ThemeCreatorApp(BlindApp):
         self.save_button.Bind(wx.EVT_BUTTON, self.on_save_theme)
 
         self.frame.Show()
-        if self.events:
+        if self.slot_labels:
             self.sound_list.SetSelection(0)
             self._refresh_assignment_display()
         self.sound_list.SetFocus()
         self.api.speak(
-            f"Editing theme {self.theme_name}. Select a sound name, browse for an audio file, then save the theme."
+            f"Editing theme {self.theme_name}. Select a sound name or background music, browse for an audio file, then save the theme."
         )
 
     def on_sound_selected(self, event=None):
         self._refresh_assignment_display()
-        sound_name = self.get_selected_event()
-        if sound_name:
-            self.api.speak(f"{sound_name} selected. {self._assignment_summary(sound_name)}")
+        slot_key = self.get_selected_slot_key()
+        if slot_key:
+            slot_label = self.slot_to_label.get(slot_key, slot_key)
+            self.api.speak(f"{slot_label} selected. {self._assignment_summary(slot_key)}")
 
-    def get_selected_event(self):
+    def get_selected_slot_key(self):
         if not self.sound_list:
             return None
         selection = self.sound_list.GetSelection()
         if selection == wx.NOT_FOUND:
             return None
-        return self.sound_list.GetString(selection)
+        return self.label_to_slot.get(self.sound_list.GetString(selection))
 
-    def _assignment_summary(self, event_name):
-        value = self.theme_data.get(event_name)
+    def _assignment_summary(self, slot_key):
+        value = self.theme_data.get(slot_key)
         if isinstance(value, str) and value:
             return f"Assigned to file {os.path.basename(value)}."
         if isinstance(value, list) and value:
             return "Currently using a saved tone sequence."
         return "No sound assigned yet."
 
-    def _format_assignment(self, event_name):
-        value = self.theme_data.get(event_name)
+    def _format_assignment(self, slot_key):
+        slot_label = self.slot_to_label.get(slot_key, slot_key)
+        value = self.theme_data.get(slot_key)
         if isinstance(value, str) and value:
-            return f"Sound: {event_name}\nType: Audio file\nPath: {value}"
+            return f"Sound: {slot_label}\nType: Audio file\nPath: {value}"
         if isinstance(value, list) and value:
-            return f"Sound: {event_name}\nType: Tone sequence\nValue: {value}"
-        return f"Sound: {event_name}\nType: Not assigned"
+            return f"Sound: {slot_label}\nType: Tone sequence\nValue: {value}"
+        return f"Sound: {slot_label}\nType: Not assigned"
 
     def _refresh_assignment_display(self):
-        event_name = self.get_selected_event()
-        if not event_name:
+        slot_key = self.get_selected_slot_key()
+        if not slot_key:
             self.assignment_display.SetValue("Select a sound name first.")
             return
-        self.assignment_display.SetValue(self._format_assignment(event_name))
+        self.assignment_display.SetValue(self._format_assignment(slot_key))
 
     def on_browse_file(self, event=None):
-        event_name = self.get_selected_event()
-        if not event_name:
+        slot_key = self.get_selected_slot_key()
+        if not slot_key:
             self.api.speak("Select a sound name before browsing for a file.")
             return
+        slot_label = self.slot_to_label.get(slot_key, slot_key)
 
         wildcard = (
             "Audio files (*.wav;*.mp3;*.ogg;*.flac)|*.wav;*.mp3;*.ogg;*.flac|"
@@ -268,7 +284,7 @@ class ThemeCreatorApp(BlindApp):
         )
         dialog = wx.FileDialog(
             self.frame,
-            f"Choose audio file for {event_name}",
+            f"Choose audio file for {slot_label}",
             wildcard=wildcard,
             style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
         )
@@ -280,19 +296,19 @@ class ThemeCreatorApp(BlindApp):
         finally:
             dialog.Destroy()
 
-        self.theme_data[event_name] = selected_path
+        self.theme_data[slot_key] = selected_path
         self._refresh_assignment_display()
-        self.api.speak(f"{event_name} set to {os.path.basename(selected_path)}.")
+        self.api.speak(f"{slot_label} set to {os.path.basename(selected_path)}.")
 
     def _validate_theme_before_save(self):
         missing_events = []
-        for event_name in self.events:
-            value = self.theme_data.get(event_name)
+        for slot_label, slot_key in self.sound_slots:
+            value = self.theme_data.get(slot_key)
             if not value:
-                missing_events.append(event_name)
+                missing_events.append(slot_label)
                 continue
             if isinstance(value, str) and not os.path.exists(value):
-                raise ValueError(f"The file for {event_name} does not exist anymore.")
+                raise ValueError(f"The file for {slot_label} does not exist anymore.")
         if missing_events:
             missing_text = ", ".join(missing_events)
             raise ValueError(f"Assign a sound file for each sound before saving. Missing: {missing_text}.")

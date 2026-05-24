@@ -66,29 +66,22 @@ class DesktopFrame(wx.Frame):
 
     def _background_music_thread(self):
         import time
-        import json
-        import sounddevice as sd
-        import soundfile as sf
-        import numpy as np
+        try:
+            import sounddevice as sd
+            import soundfile as sf
+            import numpy as np
+        except ImportError:
+            return
         
         # Wait for initial startup sound
         time.sleep(3)
         
-        music_config_path = self.api.get_data_path("music_config.json")
         current_music = None
         stream = None
+        sound_file = None
         
         while True:
-            # Check for config update
-            if os.path.exists(music_config_path):
-                try:
-                    with open(music_config_path, "r") as f:
-                        data = json.load(f)
-                        new_music = data.get("music", "None")
-                except Exception:
-                    new_music = "None"
-            else:
-                new_music = "None"
+            new_music = self.sound_manager.load_background_music()
                 
             # If music selection changed, stop stream and reset
             if new_music != current_music:
@@ -97,29 +90,37 @@ class DesktopFrame(wx.Frame):
                     stream.stop()
                     stream.close()
                     stream = None
+                if sound_file:
+                    sound_file.close()
+                    sound_file = None
             
             # Start playback if needed and not already playing
             if current_music != "None" and stream is None:
-                music_dir = os.path.join(os.getcwd(), "music")
-                music_path = os.path.join(music_dir, current_music)
+                music_path = self.sound_manager.resolve_music_path(current_music)
                 
-                if os.path.exists(music_path):
+                if music_path and os.path.exists(music_path):
                     try:
-                        file = sf.SoundFile(music_path)
+                        sound_file = sf.SoundFile(music_path)
                         def callback(outdata, frames, time, status):
-                            data = file.read(frames, fill_value=0)
+                            data = sound_file.read(frames, fill_value=0)
                             if len(data) < frames:
-                                file.seek(0)
-                                data = np.concatenate([data, file.read(frames - len(data), fill_value=0)])
+                                sound_file.seek(0)
+                                data = np.concatenate([data, sound_file.read(frames - len(data), fill_value=0)])
                             outdata[:] = data
                         
                         stream = sd.OutputStream(
-                            samplerate=file.samplerate,
-                            channels=file.channels,
+                            samplerate=sound_file.samplerate,
+                            channels=sound_file.channels,
                             callback=callback
                         )
                         stream.start()
                     except Exception:
+                        if stream:
+                            stream.close()
+                            stream = None
+                        if sound_file:
+                            sound_file.close()
+                            sound_file = None
                         time.sleep(5)
                 else:
                     time.sleep(1)
