@@ -24,6 +24,8 @@ class DesktopFrame(wx.Frame):
         
         # Start background services
         self.api.message_service.start()
+        self.music_thread = None
+        self._start_music_service()
         
         self.apps = []
         self.app_buttons = []
@@ -58,6 +60,72 @@ class DesktopFrame(wx.Frame):
         self.load_plugins()
         wx.CallAfter(self.greet)
 
+    def _start_music_service(self):
+        self.music_thread = threading.Thread(target=self._background_music_thread, daemon=True)
+        self.music_thread.start()
+
+    def _background_music_thread(self):
+        import time
+        import json
+        import sounddevice as sd
+        import soundfile as sf
+        import numpy as np
+        
+        # Wait for initial startup sound
+        time.sleep(3)
+        
+        music_config_path = self.api.get_data_path("music_config.json")
+        current_music = None
+        stream = None
+        
+        while True:
+            # Check for config update
+            if os.path.exists(music_config_path):
+                try:
+                    with open(music_config_path, "r") as f:
+                        data = json.load(f)
+                        new_music = data.get("music", "None")
+                except Exception:
+                    new_music = "None"
+            else:
+                new_music = "None"
+                
+            # If music selection changed, stop stream and reset
+            if new_music != current_music:
+                current_music = new_music
+                if stream:
+                    stream.stop()
+                    stream.close()
+                    stream = None
+            
+            # Start playback if needed and not already playing
+            if current_music != "None" and stream is None:
+                music_dir = os.path.join(os.getcwd(), "music")
+                music_path = os.path.join(music_dir, current_music)
+                
+                if os.path.exists(music_path):
+                    try:
+                        file = sf.SoundFile(music_path)
+                        def callback(outdata, frames, time, status):
+                            data = file.read(frames, fill_value=0)
+                            if len(data) < frames:
+                                file.seek(0)
+                                data = np.concatenate([data, file.read(frames - len(data), fill_value=0)])
+                            outdata[:] = data
+                        
+                        stream = sd.OutputStream(
+                            samplerate=file.samplerate,
+                            channels=file.channels,
+                            callback=callback
+                        )
+                        stream.start()
+                    except Exception:
+                        time.sleep(5)
+                else:
+                    time.sleep(1)
+            else:
+                time.sleep(1)
+        
     def on_key_down(self, event):
         keycode = event.GetKeyCode()
         if keycode == wx.WXK_F1:

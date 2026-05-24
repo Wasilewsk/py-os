@@ -42,7 +42,9 @@ class SoundManager:
         # Paths for configuration and custom themes
         self.config_path = os.path.join(self.data_dir, "sound_theme.json")
         self.custom_themes_dir = os.path.join(self.data_dir, "themes")
+        self.repo_themes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "themes")
         print(f"Custom themes directory: {repr(self.custom_themes_dir)}")
+        print(f"Repo themes directory: {repr(self.repo_themes_dir)}")
 
         # Default themes are hardcoded
         self.default_themes = {
@@ -85,23 +87,34 @@ class SoundManager:
 
     def _load_all_custom_themes(self):
         """Loads all custom themes from the theme directory."""
-        if not os.path.exists(self.custom_themes_dir):
-            os.makedirs(self.custom_themes_dir)
-            return {}
-
         custom_themes_data = {}
-        for item in os.listdir(self.custom_themes_dir):
-            theme_dir = os.path.join(self.custom_themes_dir, item)
-            if os.path.isdir(theme_dir):
-                theme_name = item
-                theme_config_path = os.path.join(theme_dir, 'theme.json')
-                if os.path.exists(theme_config_path):
-                    try:
-                        with open(theme_config_path, "r", encoding='utf-8') as f:
-                            theme_config = json.load(f)
-                            custom_themes_data[theme_name] = theme_config
-                    except Exception as e:
-                        print(f"Warning: Error loading theme config from {theme_config_path}: {e}")
+        
+        # Helper to load from a directory
+        def load_from_dir(directory):
+            if not os.path.exists(directory):
+                return
+            for item in os.listdir(directory):
+                theme_dir = os.path.join(directory, item)
+                if os.path.isdir(theme_dir):
+                    theme_name = item
+                    theme_config_path = os.path.join(theme_dir, 'theme.json')
+                    if os.path.exists(theme_config_path):
+                        try:
+                            with open(theme_config_path, "r", encoding='utf-8') as f:
+                                theme_config = json.load(f)
+                                # Convert relative paths in theme_config to absolute paths
+                                for key, value in theme_config.items():
+                                    if isinstance(value, str) and not os.path.isabs(value):
+                                        # Assume path is relative to the repository root
+                                        repo_root = os.path.dirname(os.path.abspath(__file__))
+                                        theme_config[key] = os.path.join(repo_root, value)
+                                custom_themes_data[theme_name] = theme_config
+                        except Exception as e:
+                            print(f"Warning: Error loading theme config from {theme_config_path}: {e}")
+
+        load_from_dir(self.repo_themes_dir)
+        load_from_dir(self.custom_themes_dir)
+        
         return custom_themes_data
 
     def save_custom_themes(self):

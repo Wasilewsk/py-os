@@ -1,0 +1,9 @@
+{
+    "startup": "themes/XP/Windows XP Startup.wav",
+    "nav": "themes/XP/Windows XP Menu Command.wav",
+    "launch": "themes/XP/Windows XP Start.wav",
+    "close": "themes/XP/Windows XP Minimize.wav",
+    "alert": "themes/XP/Windows XP Exclamation.wav",
+    "alarm": "themes/XP/Windows XP Critical Stop.wav",
+    "timer": "themes/XP/Windows XP Notify.wav"
+}

@@ -1,0 +1,9 @@
+{
+    "startup": ".py-os-data/themes/XP/Windows XP Startup.wav",
+    "nav": ".py-os-data/themes/XP/Windows XP Menu Command.wav",
+    "launch": ".py-os-data/themes/XP/Windows XP Start.wav",
+    "close": ".py-os-data/themes/XP/Windows XP Minimize.wav",
+    "alert": ".py-os-data/themes/XP/Windows XP Exclamation.wav",
+    "alarm": ".py-os-data/themes/XP/Windows XP Critical Stop.wav",
+    "timer": ".py-os-data/themes/XP/Windows XP Notify.wav"
+}

@@ -150,6 +150,32 @@ class SettingsApp(BlindApp):
         self.theme_choice.Bind(wx.EVT_CHOICE, self.on_theme_preview)
         sizer.Add(self.theme_choice, 0, wx.EXPAND | wx.ALL, 8)
 
+        # Background Music Section
+        music_label = wx.StaticText(panel, label="Background Music:")
+        music_label.SetForegroundColour(wx.Colour(255, 255, 255))
+        music_label.SetFont(wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        sizer.Add(music_label, 0, wx.ALL, 10)
+
+        self.music_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "music")
+        self.music_files = [f for f in os.listdir(self.music_dir) if f.lower().endswith(('.wav', '.aif', '.mp3', '.ogg'))]
+        self.music_choice = wx.Choice(panel, choices=["None"] + self.music_files)
+        self.music_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
+        self.music_choice.SetForegroundColour(wx.Colour(255, 255, 255))
+        # Load saved music
+        self.music_config_path = self.api.get_data_path("music_config.json")
+        selected_music = "None"
+        if os.path.exists(self.music_config_path):
+            with open(self.music_config_path, "r") as f:
+                import json
+                data = json.load(f)
+                selected_music = data.get("music", "None")
+        
+        if selected_music in self.music_files:
+            self.music_choice.SetSelection(self.music_files.index(selected_music) + 1)
+        else:
+            self.music_choice.SetSelection(0)
+        sizer.Add(self.music_choice, 0, wx.EXPAND | wx.ALL, 8)
+
         # Update button
         update_btn = wx.Button(panel, label="Check for Updates")
         update_btn.SetBackgroundColour(wx.Colour(50, 50, 50))
@@ -291,6 +317,12 @@ class SettingsApp(BlindApp):
             self.api.sounds.save_theme_name(selected_theme)
             self.api.sounds.current_theme = selected_theme
         
+        # Save music selection
+        selected_music = self.music_choice.GetStringSelection()
+        import json
+        with open(self.music_config_path, "w") as f:
+            json.dump({"music": selected_music}, f)
+
         if self.frame:
             self.frame.Destroy()
         self.api.sounds.play("close")
