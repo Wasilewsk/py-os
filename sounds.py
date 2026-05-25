@@ -37,12 +37,15 @@ class SoundManager:
         self.ffplay_path = shutil.which("ffplay")
         self.afplay_path = shutil.which("afplay") if self.platform_name == "Darwin" else None
         self.generated_tones_dir = os.path.join(self.data_dir, "generated_tones")
+        self.repo_root = os.path.dirname(os.path.abspath(__file__))
+        self.repo_music_dir = os.path.join(self.repo_root, "music")
         print(f"Normalized data_dir: {repr(self.data_dir)}")
 
         # Paths for configuration and custom themes
         self.config_path = os.path.join(self.data_dir, "sound_theme.json")
+        self.music_config_path = os.path.join(self.data_dir, "music_config.json")
         self.custom_themes_dir = os.path.join(self.data_dir, "themes")
-        self.repo_themes_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "themes")
+        self.repo_themes_dir = os.path.join(self.repo_root, "themes")
         print(f"Custom themes directory: {repr(self.custom_themes_dir)}")
         print(f"Repo themes directory: {repr(self.repo_themes_dir)}")
 
@@ -85,6 +88,27 @@ class SoundManager:
         self.current_theme = self.load_theme_name()
         self._audio_cache = {}
 
+    def _normalize_theme_asset(self, value):
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip()
+        if not normalized:
+            return ""
+        if normalized.lower() == "none":
+            return "None"
+        if os.path.isabs(normalized):
+            return normalized
+
+        repo_candidate = os.path.abspath(os.path.join(self.repo_root, normalized))
+        if os.path.exists(repo_candidate):
+            return repo_candidate
+
+        music_candidate = os.path.abspath(os.path.join(self.repo_music_dir, normalized))
+        if os.path.exists(music_candidate):
+            return music_candidate
+
+        return repo_candidate
+
     def _load_all_custom_themes(self):
         """Loads all custom themes from the theme directory."""
         custom_themes_data = {}
@@ -102,13 +126,11 @@ class SoundManager:
                         try:
                             with open(theme_config_path, "r", encoding='utf-8') as f:
                                 theme_config = json.load(f)
-                                # Convert relative paths in theme_config to absolute paths
                                 for key, value in theme_config.items():
-                                    if isinstance(value, str) and not os.path.isabs(value):
-                                        # Assume path is relative to the repository root
-                                        repo_root = os.path.dirname(os.path.abspath(__file__))
-                                        theme_config[key] = os.path.join(repo_root, value)
-                                custom_themes_data[theme_name] = theme_config
+                                    theme_config[key] = self._normalize_theme_asset(value)
+                                merged_theme = dict(custom_themes_data.get(theme_name, {}))
+                                merged_theme.update(theme_config)
+                                custom_themes_data[theme_name] = merged_theme
                         except Exception as e:
                             print(f"Warning: Error loading theme config from {theme_config_path}: {e}")
 
@@ -161,6 +183,47 @@ class SoundManager:
                     json.dump({"theme": name}, f)
             except Exception as e:
                 print(f"Error saving theme name: {e}")
+            theme_music = self.get_theme_background_music(name)
+            if theme_music is not None:
+                self.save_background_music(theme_music)
+
+    def load_background_music(self):
+        if not os.path.exists(self.data_dir):
+            os.makedirs(self.data_dir)
+        if os.path.exists(self.music_config_path):
+            try:
+                with open(self.music_config_path, "r", encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get("music", "None")
+            except Exception:
+                return "None"
+        return "None"
+
+    def save_background_music(self, music_value):
+        if not os.path.exists(self.data_dir):
+            os.makedirs(self.data_dir)
+        stored_value = music_value if music_value else "None"
+        try:
+            with open(self.music_config_path, "w", encoding='utf-8') as f:
+                json.dump({"music": stored_value}, f)
+        except Exception as e:
+            print(f"Error saving background music: {e}")
+
+    def resolve_music_path(self, music_value):
+        if not music_value or music_value == "None":
+            return None
+        normalized = self._normalize_theme_asset(music_value)
+        if isinstance(normalized, str) and os.path.isabs(normalized):
+            return normalized
+        return None
+
+    def get_theme_background_music(self, theme_name=None):
+        selected_theme = theme_name or self.current_theme
+        theme_data = self.themes.get(selected_theme, {})
+        music_value = self._normalize_theme_asset(theme_data.get("background_music", "None"))
+        if not music_value:
+            return "None"
+        return music_value
 
     def play(self, sound_type):
         if self.current_theme not in self.themes:

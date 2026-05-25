@@ -4,6 +4,7 @@ import datetime
 import subprocess
 import sys
 import platform
+import json
 import speech
 from api import BlindApp
 import audio_devices
@@ -26,6 +27,8 @@ class SettingsApp(BlindApp):
         self.input_entries = []
         self.output_entries = []
         self.platform_name = platform.system()
+        self.music_files = []
+        self.music_choice_values = []
 
     def run(self):
         self.frame = wx.Frame(None, title="Settings", size=(500, 600))
@@ -157,23 +160,20 @@ class SettingsApp(BlindApp):
         sizer.Add(music_label, 0, wx.ALL, 10)
 
         self.music_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "music")
-        self.music_files = [f for f in os.listdir(self.music_dir) if f.lower().endswith(('.wav', '.aif', '.mp3', '.ogg'))]
-        self.music_choice = wx.Choice(panel, choices=["None"] + self.music_files)
+        if os.path.isdir(self.music_dir):
+            self.music_files = sorted(
+                [f for f in os.listdir(self.music_dir) if f.lower().endswith(('.wav', '.aif', '.mp3', '.ogg'))],
+                key=str.lower,
+            )
+        else:
+            self.music_files = []
+        self.music_choice_values = ["None"] + self.music_files
+        self.music_choice = wx.Choice(panel, choices=[self._music_choice_label(value) for value in self.music_choice_values])
         self.music_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
         self.music_choice.SetForegroundColour(wx.Colour(255, 255, 255))
-        # Load saved music
-        self.music_config_path = self.api.get_data_path("music_config.json")
-        selected_music = "None"
-        if os.path.exists(self.music_config_path):
-            with open(self.music_config_path, "r") as f:
-                import json
-                data = json.load(f)
-                selected_music = data.get("music", "None")
-        
-        if selected_music in self.music_files:
-            self.music_choice.SetSelection(self.music_files.index(selected_music) + 1)
-        else:
-            self.music_choice.SetSelection(0)
+        self.music_config_path = self.api.sounds.music_config_path
+        selected_music = self.api.sounds.load_background_music()
+        self._set_music_choice_value(selected_music)
         sizer.Add(self.music_choice, 0, wx.EXPAND | wx.ALL, 8)
 
         # Update button
@@ -234,8 +234,37 @@ class SettingsApp(BlindApp):
         theme_name = self.theme_choice.GetStringSelection()
         if theme_name:
             self.api.sounds.current_theme = theme_name
+            theme_music = self.api.sounds.get_theme_background_music(theme_name)
+            if theme_music is not None:
+                self._set_music_choice_value(theme_music)
             self.api.play_sound("startup")
             self.api.speak(theme_name)
+
+    def _music_choice_label(self, music_value):
+        if not music_value or music_value == "None":
+            return "None"
+        if music_value in self.music_files:
+            return music_value
+        base_name = os.path.basename(music_value)
+        return f"Custom: {base_name or music_value}"
+
+    def _set_music_choice_value(self, music_value):
+        normalized = music_value if music_value else "None"
+        try:
+            index = self.music_choice_values.index(normalized)
+        except ValueError:
+            self.music_choice_values.append(normalized)
+            self.music_choice.Append(self._music_choice_label(normalized))
+            index = len(self.music_choice_values) - 1
+        self.music_choice.SetSelection(index)
+
+    def _get_selected_music_value(self):
+        selection = self.music_choice.GetSelection()
+        if selection == wx.NOT_FOUND:
+            return "None"
+        if 0 <= selection < len(self.music_choice_values):
+            return self.music_choice_values[selection]
+        return "None"
 
     def _apply_speech_mode_selection(self, announce=True):
         sel = self.speech_choice.GetSelection()
@@ -318,10 +347,8 @@ class SettingsApp(BlindApp):
             self.api.sounds.current_theme = selected_theme
         
         # Save music selection
-        selected_music = self.music_choice.GetStringSelection()
-        import json
-        with open(self.music_config_path, "w") as f:
-            json.dump({"music": selected_music}, f)
+        selected_music = self._get_selected_music_value()
+        self.api.sounds.save_background_music(selected_music)
 
         if self.frame:
             self.frame.Destroy()
