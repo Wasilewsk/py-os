@@ -44,11 +44,24 @@ To enable direct NVDA support:
 1. Download `nvdaControllerClient64.dll` (for 64-bit Python) or `nvdaControllerClient32.dll` (for 32-bit Python) from the [NVDA GitHub Repository](https://github.com/nvaccess/nvda/tree/master/extras/controllerClient).
 2. Place the DLL in the same folder as `desktop.py`.
 
+## Installation Guide for Windows
+
+To install py-os and set everything up automatically:
+
+1.  **Run the Installer:**
+    Double-click `setup.bat` in the project root. This will:
+    -   Check for Python.
+    -   Create a virtual environment (`venv`).
+    -   Install all required dependencies.
+    -   Create a `launch.bat` file.
+    -   Create a **Desktop Shortcut** named "py-os Simulator".
+
+2.  **Launch the Application:**
+    You can now start the simulator by double-clicking the shortcut on your Desktop or by running `launch.bat`.
+
 ---
 
-## Installation Guide for GitHub
-
-To get started with py-os and prepare it for use from source:
+## Installation Guide for GitHub (Manual)
 
 1.  **Clone the repository:**
     First, clone the proj

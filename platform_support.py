@@ -3,11 +3,61 @@ import os
 import platform
 import subprocess
 import shutil
+import sys
 from pathlib import Path
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
+
+if not msvcrt:
+    try:
+        import termios
+        import tty
+        import select
+    except ImportError:
+        termios = None
+        tty = None
+        select = None
 
 
 def get_platform_name():
     return platform.system()
+
+
+def getch():
+    """Wait for a keypress and return a byte string."""
+    if msvcrt:
+        return msvcrt.getch()
+    elif termios and tty:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+            return ch.encode()
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    else:
+        return sys.stdin.read(1).encode()
+
+
+def kbhit():
+    """Return True if a keypress is waiting to be read."""
+    if msvcrt:
+        return msvcrt.kbhit()
+    elif termios and select:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            dr, dw, de = select.select([sys.stdin], [], [], 0)
+            return len(dr) > 0
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    else:
+        return False
 
 
 def command_path(name):

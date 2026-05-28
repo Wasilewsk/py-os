@@ -11,8 +11,7 @@ import sys
 import time
 from api import SystemAPI
 from app_paths import get_data_dir
-
-import msvcrt
+import platform_support
 
 class RecoveryConsole(wx.Dialog):
     def __init__(self, parent, missing_files):
@@ -451,10 +450,16 @@ def print_centered(text, row):
 
 def wait_for_key(expected_keys=None):
     while True:
-        if msvcrt.kbhit():
-            key = msvcrt.getch()
+        if platform_support.kbhit():
+            key = platform_support.getch()
             if key in [b'\x00', b'\xe0']:
-                key += msvcrt.getch()
+                key += platform_support.getch()
+            elif key == b'\x1b':
+                # On Linux, handle escape sequences (simplistic)
+                if platform_support.kbhit():
+                    key += platform_support.getch()
+                    if platform_support.kbhit():
+                        key += platform_support.getch()
             if expected_keys is None:
                 return key
             if key in expected_keys:
