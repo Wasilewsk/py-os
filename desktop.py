@@ -449,21 +449,26 @@ def print_centered(text, row):
     sys.stdout.flush()
 
 def wait_for_key(expected_keys=None):
-    while True:
-        if platform_support.kbhit():
-            key = platform_support.getch()
-            if key in [b'\x00', b'\xe0']:
-                key += platform_support.getch()
-            elif key == b'\x1b':
-                # On Linux, handle escape sequences (simplistic)
-                if platform_support.kbhit():
+    with platform_support.raw_mode(sys.stdin):
+        while True:
+            if platform_support.kbhit():
+                # Note: platform_support.getch() internally also uses raw_mode, 
+                # but nested raw_mode should be fine with our implementation.
+                # However, for efficiency, we could read directly here if in raw_mode.
+                key = platform_support.getch()
+                if key in [b'\x00', b'\xe0']:
                     key += platform_support.getch()
+                elif key == b'\x1b':
+                    # On Linux, handle escape sequences (simplistic)
                     if platform_support.kbhit():
                         key += platform_support.getch()
-            if expected_keys is None:
-                return key
-            if key in expected_keys:
-                return key
+                        if platform_support.kbhit():
+                            key += platform_support.getch()
+                if expected_keys is None:
+                    return key
+                if key in expected_keys:
+                    return key
+            time.sleep(0.01) # Add a small sleep to prevent 100% CPU usage
 
 def check_system_integrity():
     critical_files = [

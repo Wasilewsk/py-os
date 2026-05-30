@@ -5,11 +5,17 @@ import subprocess
 import shutil
 import sys
 from pathlib import Path
+from contextlib import contextmanager
+
+msvcrt = None
+termios = None
+tty = None
+select = None
 
 try:
     import msvcrt
 except ImportError:
-    msvcrt = None
+    pass
 
 if not msvcrt:
     try:
@@ -17,9 +23,22 @@ if not msvcrt:
         import tty
         import select
     except ImportError:
-        termios = None
-        tty = None
-        select = None
+        pass
+
+
+@contextmanager
+def raw_mode(file):
+    if not termios or not tty:
+        yield
+        return
+    
+    fd = file.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        yield
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 def get_platform_name():
@@ -31,14 +50,9 @@ def getch():
     if msvcrt:
         return msvcrt.getch()
     elif termios and tty:
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
+        with raw_mode(sys.stdin):
             ch = sys.stdin.read(1)
             return ch.encode()
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     else:
         return sys.stdin.read(1).encode()
 
@@ -47,15 +61,9 @@ def kbhit():
     """Return True if a keypress is waiting to be read."""
     if msvcrt:
         return msvcrt.kbhit()
-    elif termios and select:
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            dr, dw, de = select.select([sys.stdin], [], [], 0)
-            return len(dr) > 0
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    elif select:
+        dr, dw, de = select.select([sys.stdin], [], [], 0)
+        return len(dr) > 0
     else:
         return False
 
