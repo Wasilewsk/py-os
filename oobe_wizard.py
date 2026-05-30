@@ -2,6 +2,16 @@ import wx
 import os
 import json
 
+MUSIC_FILES = [
+    "01 Windows XP Tour intro.aif",
+    "02 Windows XP Tour 1.aif",
+    "03 Windows XP Tour 2.aif",
+    "04 Windows XP Tour 3.aif",
+    "05 Windows XP Tour 5.aif",
+    "07 Windows XP Tour 6.aif",
+    "1996 Internet Starter Kit - Velkommen - Original Mix.wav",
+]
+
 class OOBEWizard(wx.Frame):
     def __init__(self, api, on_finish):
         super().__init__(None, title="PyOS Setup", size=(600, 500), style=wx.DEFAULT_FRAME_STYLE | wx.STAY_ON_TOP)
@@ -22,6 +32,7 @@ class OOBEWizard(wx.Frame):
         self.user_data = {}
         self.install_timer = None
         self.install_progress = 0
+        self.music_index = 0
 
         self.panel = wx.Panel(self)
         self.sizer = wx.BoxSizer(wx.VERTICAL)
@@ -31,12 +42,34 @@ class OOBEWizard(wx.Frame):
         
         self.panel.SetSizer(self.sizer)
         self.Bind(wx.EVT_CLOSE, self.on_close)
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_key)
         
         # Play XP intro music if possible
         self.play_intro_music()
         
         self.show_step()
         self.Centre()
+
+    def on_key(self, event):
+        if event.GetKeyCode() == wx.WXK_F5:
+            self.cycle_music()
+        else:
+            event.Skip()
+
+    def cycle_music(self):
+        self.music_index = (self.music_index + 1) % len(MUSIC_FILES)
+        track = MUSIC_FILES[self.music_index]
+        music_path = os.path.join(os.getcwd(), "music", track)
+        if os.path.exists(music_path):
+            music_config = {"music": track}
+            config_file = self.api.get_data_path("music_config.json")
+            try:
+                with open(config_file, "w") as f:
+                    json.dump(music_config, f)
+                name = track.replace(".aif", "").replace(".wav", "").replace("_", " ").strip()
+                self.api.speak(f"Now playing: {name}")
+            except Exception as e:
+                print(f"Error cycling music: {e}")
 
     def on_close(self, event):
         if self.install_timer:
@@ -242,8 +275,8 @@ class OOBEWizard(wx.Frame):
         text.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
         text.SetForegroundColour(wx.Colour(255, 255, 255))
         self.content_sizer.Add(text, 0, wx.ALL, 10)
-        
-        self.acc_check = wx.CheckBox(self.panel, label="Use screen reader optimized mode")
+
+        self.acc_check = wx.CheckBox(self.panel, label="Use screen reader enhanced mode")
         self.acc_check.SetForegroundColour(wx.Colour(255, 255, 255))
         self.acc_check.SetValue(True)
         self.content_sizer.Add(self.acc_check, 0, wx.ALL, 10)
@@ -253,7 +286,7 @@ class OOBEWizard(wx.Frame):
         self.content_sizer.Add(btn, 0, wx.ALL | wx.RIGHT, 10)
         
         self.acc_check.SetFocus()
-        self.api.speak("Would you like to use screen reader optimized mode? This is enabled by default. Press Space to toggle and Enter to continue.")
+        self.api.speak("Would you like to use screen reader enhanced mode? This is enabled by default. Press Space to toggle and Enter to continue.")
 
     def on_acc_submit(self, event):
         self.user_data["accessibility_mode"] = self.acc_check.GetValue()

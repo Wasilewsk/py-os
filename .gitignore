@@ -26,3 +26,6 @@ venv/
 *.zip
 # Local status scratchpad
 PILessstatus.txt
+
+# Data directory
+.py-os-data/

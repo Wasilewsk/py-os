@@ -1,6 +1,7 @@
 import wx
 import speech
 import os
+import json
 import subprocess # For executing files
 import importlib # Import importlib for dynamic module loading
 
@@ -32,6 +33,44 @@ class BlindApp:
     def speak(self, text, interrupt=True):
         """Helper to speak text via system engine."""
         self.api.engine.speak(text, interrupt)
+
+    def get_speech_mode(self):
+        """Return current speech mode (auto, nvda, system, pyttsx3)."""
+        return getattr(self.api.engine, "get_mode", lambda: "auto")()
+
+    def set_speech_mode(self, mode):
+        """Set speech mode. Returns True if successful."""
+        return getattr(self.api.engine, "set_mode", lambda _: False)(mode)
+
+    def get_available_speech_modes(self):
+        """Return list of (label, value) tuples for speech modes."""
+        return getattr(self.api.engine, "get_available_modes", lambda: [("Auto", "auto")])()
+
+    def is_enhanced_mode(self):
+        """Check if enhanced mode is enabled."""
+        config_path = self.api.get_data_path("config.json")
+        try:
+            with open(config_path, "r") as f:
+                config = json.load(f)
+            return config.get("enhanced_mode", False)
+        except Exception:
+            return False
+
+    def set_enhanced_mode(self, enabled):
+        """Set enhanced mode on/off."""
+        config_path = self.api.get_data_path("config.json")
+        try:
+            with open(config_path, "r") as f:
+                config = json.load(f)
+        except Exception:
+            config = {}
+        config["enhanced_mode"] = bool(enabled)
+        try:
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=2)
+            return True
+        except Exception:
+            return False
 
 class SystemAPI:
     """Bridge between apps and the OS core."""
