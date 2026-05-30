@@ -2,15 +2,11 @@ import wx
 import os
 import json
 
-MUSIC_FILES = [
-    "01 Windows XP Tour intro.aif",
-    "02 Windows XP Tour 1.aif",
-    "03 Windows XP Tour 2.aif",
-    "04 Windows XP Tour 3.aif",
-    "05 Windows XP Tour 5.aif",
-    "07 Windows XP Tour 6.aif",
-    "1996 Internet Starter Kit - Velkommen - Original Mix.wav",
-]
+MUSIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "music")
+MUSIC_FILES = sorted(
+    [f for f in os.listdir(MUSIC_DIR) if f.lower().endswith(('.wav', '.aif', '.mp3', '.ogg'))],
+    key=str.lower,
+) if os.path.isdir(MUSIC_DIR) else []
 
 class OOBEWizard(wx.Frame):
     def __init__(self, api, on_finish):

@@ -412,16 +412,22 @@ class PyOSController:
         import numpy as np
         music_config_path = self.api.get_data_path("music_config.json")
         current_music = None
+        current_volume = None
         stream = None
         while True:
             new_music = "None"
+            new_volume = 50
             if os.path.exists(music_config_path):
                 try:
                     with open(music_config_path, "r") as f:
-                        new_music = json.load(f).get("music", "None")
+                        cfg = json.load(f)
+                        new_music = cfg.get("music", "None")
+                        new_volume = cfg.get("volume", 50)
                 except Exception: pass
-            if new_music != current_music:
+            volume_changed = new_volume != current_volume
+            if new_music != current_music or volume_changed:
                 current_music = new_music
+                current_volume = new_volume
                 if stream:
                     stream.stop()
                     stream.close()
@@ -431,12 +437,13 @@ class PyOSController:
                 if os.path.exists(music_path):
                     try:
                         file = sf.SoundFile(music_path)
+                        vol = current_volume / 100.0
                         def callback(outdata, frames, time, status):
                             data = file.read(frames, fill_value=0)
                             if len(data) < frames:
                                 file.seek(0)
                                 data = np.concatenate([data, file.read(frames - len(data), fill_value=0)])
-                            outdata[:] = data
+                            outdata[:] = data * vol
                         stream = sd.OutputStream(samplerate=file.samplerate, channels=file.channels, callback=callback)
                         stream.start()
                     except Exception: time.sleep(5)

@@ -5,6 +5,8 @@ import subprocess
 import sys
 import platform
 import json
+import threading
+import time
 import speech
 from api import BlindApp
 import audio_devices
@@ -206,6 +208,14 @@ class SettingsApp(BlindApp):
         self._set_music_choice_value(selected_music)
         sizer.Add(self.music_choice, 0, wx.EXPAND | wx.ALL, 8)
 
+        volume_box = wx.StaticBox(panel, label="Background Music Volume")
+        volume_sizer = wx.StaticBoxSizer(volume_box, wx.VERTICAL)
+        self.music_volume = wx.Slider(panel, value=50, minValue=0, maxValue=100, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
+        self.music_volume.SetBackgroundColour(wx.Colour(40, 40, 40))
+        self.music_volume.SetValue(self._load_music_volume())
+        volume_sizer.Add(self.music_volume, 0, wx.EXPAND | wx.ALL, 10)
+        sizer.Add(volume_sizer, 0, wx.EXPAND | wx.ALL, 10)
+
         self.notebook.AddPage(panel, "Theme")
 
     def _build_updates_tab(self):
@@ -215,11 +225,16 @@ class SettingsApp(BlindApp):
         info.SetForegroundColour(wx.Colour(200, 200, 200))
         sizer.Add(info, 0, wx.ALL, 15)
 
-        update_btn = wx.Button(panel, label="Check for Updates")
-        update_btn.SetBackgroundColour(wx.Colour(50, 50, 50))
-        update_btn.SetForegroundColour(wx.Colour(255, 255, 255))
-        update_btn.Bind(wx.EVT_BUTTON, self.check_updates)
-        sizer.Add(update_btn, 0, wx.EXPAND | wx.ALL, 10)
+        self.update_gauge = wx.Gauge(panel, range=100, size=(-1, 20))
+        self.update_gauge.SetBackgroundColour(wx.Colour(40, 40, 40))
+        self.update_gauge.Hide()
+        sizer.Add(self.update_gauge, 0, wx.EXPAND | wx.ALL, 10)
+
+        self.update_btn = wx.Button(panel, label="Check for Updates")
+        self.update_btn.SetBackgroundColour(wx.Colour(50, 50, 50))
+        self.update_btn.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.update_btn.Bind(wx.EVT_BUTTON, self.check_updates)
+        sizer.Add(self.update_btn, 0, wx.EXPAND | wx.ALL, 10)
 
         self.notebook.AddPage(panel, "Updates")
 
@@ -294,6 +309,26 @@ class SettingsApp(BlindApp):
             return self.music_choice_values[selection]
         return "None"
 
+    def _load_music_volume(self):
+        try:
+            with open(self.music_config_path, "r") as f:
+                config = json.load(f)
+            return config.get("volume", 50)
+        except Exception:
+            return 50
+
+    def _save_music_volume(self):
+        try:
+            config = {}
+            if os.path.exists(self.music_config_path):
+                with open(self.music_config_path, "r") as f:
+                    config = json.load(f)
+            config["volume"] = self.music_volume.GetValue()
+            with open(self.music_config_path, "w") as f:
+                json.dump(config, f)
+        except Exception:
+            pass
+
     def _apply_speech_mode_selection(self, announce=True):
         sel = self.speech_choice.GetSelection()
         if sel < 0 or sel >= len(self.speech_modes):
@@ -314,31 +349,67 @@ class SettingsApp(BlindApp):
         self._apply_speech_mode_selection(announce=True)
 
     def check_updates(self, event):
+        self.update_btn.Disable()
+        self.update_gauge.SetValue(0)
+        self.update_gauge.Show()
         self.api.speak("Checking for updates...")
+        threading.Thread(target=self._update_thread, daemon=True).start()
+
+    def _update_thread(self):
+        def set_gauge(val):
+            wx.CallAfter(self.update_gauge.SetValue, val)
+        def speak(msg):
+            wx.CallAfter(self.api.speak, msg)
+        def hide_gauge():
+            wx.CallAfter(self.update_gauge.Hide)
+            wx.CallAfter(self.update_btn.Enable)
+
         try:
-            subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/wasilewsk/py-os.git"], check=True)
+            set_gauge(10)
+            subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/wasilewsk/py-os.git"],
+                           check=True, capture_output=True, text=True)
+            set_gauge(25)
+
             branch_result = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=True,
+                capture_output=True, text=True, check=True,
             )
             branch_name = branch_result.stdout.strip() or "master"
-            result = subprocess.run(["git", "pull", "origin", branch_name], capture_output=True, text=True, check=True)
-            
+            set_gauge(35)
+
+            result = subprocess.run(
+                ["git", "pull", "origin", branch_name],
+                capture_output=True, text=True, check=True,
+            )
+            set_gauge(60)
+
             if "Already up to date" in result.stdout:
-                self.api.speak("System is already up to date. Checking requirements...")
+                speak("System is already up to date. Checking requirements...")
             else:
-                self.api.speak("Core updates downloaded. Updating requirements...")
-            
-            # Re-install requirements
-            subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
+                speak("Core updates downloaded. Updating requirements...")
+
+            set_gauge(75)
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+                check=True, capture_output=True, text=True,
+            )
+            set_gauge(95)
             self.cleanup_deprecated_sound_artifacts()
-            self.api.speak("Update completed successfully. All dependencies are up to date.")
+            set_gauge(100)
+            speak("Update complete. Restarting...")
+            time.sleep(1)
+            subprocess.Popen([sys.executable, os.path.join(os.getcwd(), "desktop.py")], cwd=os.getcwd())
+            hide_gauge()
+            wx.CallAfter(self.frame.Close)
+            wx.CallAfter(wx.GetApp().ExitMainLoop)
+
         except subprocess.CalledProcessError as e:
-            self.api.speak(f"Update failed: {e.stderr if e.stderr else 'Check your internet connection or git status'}")
+            err = e.stderr if e.stderr else "Check your internet connection or git status"
+            speak(f"Update failed: {err}")
+            hide_gauge()
         except Exception as e:
-            self.api.speak(f"Error during update: {e}")
+            speak(f"Error during update: {e}")
+            hide_gauge()
 
     def cleanup_deprecated_sound_artifacts(self):
         """Clean stale/legacy sound-theme artifacts without resetting active settings."""
@@ -377,6 +448,7 @@ class SettingsApp(BlindApp):
         # Save music selection
         selected_music = self._get_selected_music_value()
         self.api.sounds.save_background_music(selected_music)
+        self._save_music_volume()
 
         if self.frame:
             self.frame.Destroy()
@@ -556,38 +628,69 @@ class CalculatorApp(BlindApp):
     def __init__(self, api):
         super().__init__(api)
         self.name = "Calculator"
-        self.description = "Basic math calculator."
-        self.help_text = "Type an expression like '2 + 2' and press Enter."
+        self.description = "Basic math calculator with calculation history."
+        self.help_text = "Type an expression like '2 + 2' and press Enter. Use Up/Down arrows to review past calculations."
         self.docs = "Calculator supports basic arithmetic: addition (+), subtraction (-), multiplication (*), and division (/)."
+        self.history = []
+        self.history_index = -1
 
     def run(self):
-        self.frame = wx.Frame(None, title="Calculator", size=(400, 200))
+        self.frame = wx.Frame(None, title="Calculator", size=(400, 120))
         panel = wx.Panel(self.frame)
         panel.SetBackgroundColour(wx.Colour(0, 0, 0))
         
         sizer = wx.BoxSizer(wx.VERTICAL)
+        
         self.input_ctrl = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
-        sizer.Add(self.input_ctrl, 0, wx.EXPAND | wx.ALL, 20)
+        self.input_ctrl.SetBackgroundColour(wx.Colour(30, 30, 30))
+        self.input_ctrl.SetForegroundColour(wx.Colour(255, 255, 255))
+        sizer.Add(self.input_ctrl, 1, wx.EXPAND | wx.ALL, 10)
         
         panel.SetSizer(sizer)
         self.input_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_calc)
+        self.input_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_input_key)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
         
         self.frame.Show()
-        self.api.speak("Calculator opened. Enter an expression.")
+        self.api.speak("Calculator opened. Enter an expression. Use Up and Down arrows to browse history.")
         self.input_ctrl.SetFocus()
+
+    def on_input_key(self, event):
+        key = event.GetKeyCode()
+        if key == wx.WXK_UP and self.history:
+            if self.history_index < len(self.history) - 1:
+                self.history_index += 1
+                expr = self.history[self.history_index][0]
+                self.input_ctrl.SetValue(expr)
+                self.input_ctrl.SetInsertionPointEnd()
+                self.api.speak(expr)
+            return
+        elif key == wx.WXK_DOWN:
+            if self.history_index > 0:
+                self.history_index -= 1
+                expr = self.history[self.history_index][0]
+                self.input_ctrl.SetValue(expr)
+                self.input_ctrl.SetInsertionPointEnd()
+                self.api.speak(expr)
+            elif self.history_index == 0:
+                self.history_index = -1
+                self.input_ctrl.Clear()
+                self.api.speak("New expression")
+            return
+        event.Skip()
 
     def on_calc(self, event):
         expr = self.input_ctrl.GetValue()
         self.input_ctrl.Clear()
         try:
-            # Note: eval is dangerous in a real OS, but for a simulator it's okay for now.
-            # Using a safe dict for eval.
             result = eval(expr, {"__builtins__": None}, {})
             msg = f"Result: {result}"
+            self.history.insert(0, (expr, str(result)))
         except Exception:
             msg = "Error: Invalid expression."
+            self.history.insert(0, (expr, "Error"))
         
+        self.history_index = -1
         self.api.speak(msg)
 
 class TextEditorApp(BlindApp):
