@@ -2,6 +2,8 @@
 build/
 dist/
 *.spec
+PLAN.md
+launch.bat
 
 # Python cache
 __pycache__/

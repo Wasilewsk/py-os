@@ -582,3 +582,4 @@ if __name__ == "__main__":
     controller = PyOSController()
     controller.start()
     app.MainLoop()
+    controller.sound_manager.play_sync("shutdown")

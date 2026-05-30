@@ -56,6 +56,7 @@ class SoundManager:
                 "nav": [(600, 50)],
                 "launch": [(440, 100), (880, 100)],
                 "close": [(880, 100), (440, 100)],
+                "shutdown": [(698, 300), (523, 200), (349, 400)],
                 "alert": [(1000, 200), (800, 200)],
                 "alarm": [(1000, 200), (800, 200)],
                 "timer": [(1000, 200), (800, 200)],
@@ -65,6 +66,7 @@ class SoundManager:
                 "nav": [(150, 30)],
                 "launch": [(200, 50), (400, 50), (600, 50)],
                 "close": [(600, 50), (400, 50), (200, 50)],
+                "shutdown": [(500, 150), (300, 200), (100, 400)],
                 "alert": [(400, 100), (400, 100), (400, 100)],
                 "alarm": [(400, 100), (400, 100), (400, 100)],
                 "timer": [(400, 100), (400, 100), (400, 100)],
@@ -74,6 +76,7 @@ class SoundManager:
                 "nav": [(400, 20)],
                 "launch": [(523, 100)],
                 "close": [(261, 100)],
+                "shutdown": [(261, 400), (196, 600)],
                 "alert": [(1000, 500)],
                 "alarm": [(1000, 500)],
                 "timer": [(1000, 500)],
@@ -225,10 +228,9 @@ class SoundManager:
             return "None"
         return music_value
 
-    def play(self, sound_type):
+    def _resolve_sound_data(self, sound_type):
         if self.current_theme not in self.themes:
             self.current_theme = "Modern"
-
         theme_data = self.themes.get(self.current_theme, self.themes["Modern"])
         fallback_map = {
             "timer": "alert",
@@ -239,13 +241,16 @@ class SoundManager:
             data = theme_data.get(fallback_map[sound_type])
         if not data and sound_type in fallback_map:
             data = self.themes["Modern"].get(sound_type) or self.themes["Modern"].get(fallback_map[sound_type])
+        return data
+
+    def play(self, sound_type):
+        data = self._resolve_sound_data(sound_type)
         if not data: return
 
         if self.platform_name == "Windows" and winsound is not None and not isinstance(data, str):
             if self._play_notes_with_winsound_file(data, async_play=sound_type != "startup"):
                 return
 
-        # Startup sound is synchronous
         if sound_type == "startup":
             if isinstance(data, str):
                 self._play_file_sync(data)
@@ -256,6 +261,14 @@ class SoundManager:
                 threading.Thread(target=self._play_file, args=(data,), daemon=True).start()
             else:
                 threading.Thread(target=self._play_notes, args=(data,), daemon=True).start()
+
+    def play_sync(self, sound_type):
+        data = self._resolve_sound_data(sound_type)
+        if not data: return
+        if isinstance(data, str):
+            self._play_file_sync(data)
+        else:
+            self._play_notes_sync(data)
 
     def _play_notes(self, notes):
         """Play a sequence of notes using ffplay and lavfi."""

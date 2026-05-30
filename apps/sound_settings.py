@@ -18,6 +18,7 @@ class ThemeCreatorApp(BlindApp):
         )
         self.sound_slots = [
             ("startup", "startup"),
+            ("shutdown", "shutdown"),
             ("nav", "nav"),
             ("alert", "alert"),
             ("launch", "launch"),

@@ -21,7 +21,7 @@ class SettingsApp(BlindApp):
         super().__init__(api)
         self.name = "System Settings"
         self.description = "Configure speech, audio devices, themes, and updates."
-        self.help_text = "Use Tab to navigate controls, and Enter to save."
+        self.help_text = "Use Tab to navigate between tabs and controls. Switch tabs with Ctrl+Tab."
         self.docs = "Settings lets you adjust speech rate, choose a speech backend, configure audio devices, and manage sound themes."
         self.device_config_path = self.api.get_data_path("device_config.json")
         self.input_entries = []
@@ -31,29 +31,68 @@ class SettingsApp(BlindApp):
         self.music_choice_values = []
 
     def run(self):
-        self.frame = wx.Frame(None, title="Settings", size=(500, 600))
+        self.frame = wx.Frame(None, title="Settings", size=(550, 600))
         panel = wx.Panel(self.frame)
         panel.SetBackgroundColour(wx.Colour(30, 30, 30))
         
         sizer = wx.BoxSizer(wx.VERTICAL)
         
-        # Title
         title = wx.StaticText(panel, label="System Settings")
         title.SetForegroundColour(wx.Colour(255, 255, 255))
         title.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-        sizer.Add(title, 0, wx.ALL | wx.CENTER, 15)
+        sizer.Add(title, 0, wx.ALL | wx.CENTER, 10)
+
+        self.notebook = wx.Notebook(panel)
+        self.notebook.SetBackgroundColour(wx.Colour(30, 30, 30))
+        self.notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.on_tab_changed)
+
+        self._build_speech_tab()
+        if HAS_SOUNDDEVICE:
+            self._build_audio_tab()
+        self._build_theme_tab()
+        self._build_updates_tab()
+
+        sizer.Add(self.notebook, 1, wx.EXPAND | wx.ALL, 10)
+
+        close_btn = wx.Button(panel, label="Save and Close")
+        close_btn.SetBackgroundColour(wx.Colour(0, 100, 0))
+        close_btn.SetForegroundColour(wx.Colour(255, 255, 255))
+        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        sizer.Add(close_btn, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 15)
+
+        panel.SetSizer(sizer)
+        self.frame.Bind(wx.EVT_CLOSE, self.on_close)
+        self.frame.Show()
+        self.notebook.SetFocus()
+        self.api.speak("Settings opened with tabs. Use Ctrl+Tab to switch between Speech, Audio, Theme, and Updates.")
+
+    def _make_tab_panel(self):
+        panel = wx.Panel(self.notebook)
+        panel.SetBackgroundColour(wx.Colour(20, 20, 20))
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        panel.SetSizer(sizer)
+        return panel, sizer
+
+    def on_tab_changed(self, event):
+        idx = self.notebook.GetSelection()
+        labels = []
+        for i in range(self.notebook.GetPageCount()):
+            labels.append(self.notebook.GetPageText(i))
+        if 0 <= idx < len(labels):
+            self.api.speak(f"{labels[idx]} settings")
+
+    def _build_speech_tab(self):
+        panel, sizer = self._make_tab_panel()
         
-        # Voice Speed Section
         voice_label = wx.StaticText(panel, label="Voice Speed:")
         voice_label.SetForegroundColour(wx.Colour(255, 255, 255))
         sizer.Add(voice_label, 0, wx.ALL, 10)
         
-        self.speed_slider = wx.Slider(panel, value=200, minValue=50, maxValue=400, style=wx.SL_HORIZONTAL)
+        self.speed_slider = wx.Slider(panel, value=200, minValue=50, maxValue=400, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
         self.speed_slider.SetValue(getattr(self.api.engine, "get_rate", lambda: 200)())
         self.speed_slider.SetBackgroundColour(wx.Colour(40, 40, 40))
         sizer.Add(self.speed_slider, 0, wx.EXPAND | wx.ALL, 10)
 
-        # Speech Engine Section
         speech_label = wx.StaticText(panel, label="Speech Engine:")
         speech_label.SetForegroundColour(wx.Colour(255, 255, 255))
         sizer.Add(speech_label, 0, wx.ALL, 10)
@@ -65,80 +104,73 @@ class SettingsApp(BlindApp):
         self.speech_choice.SetSelection(idx)
         self.speech_choice.Bind(wx.EVT_CHOICE, self.on_speech_mode_change)
         sizer.Add(self.speech_choice, 0, wx.EXPAND | wx.ALL, 8)
-        
-        # Audio Devices Section
-        if HAS_SOUNDDEVICE:
-            devices_label = wx.StaticText(panel, label="Audio Devices:")
-            devices_label.SetForegroundColour(wx.Colour(255, 255, 255))
-            devices_label.SetFont(wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-            sizer.Add(devices_label, 0, wx.ALL, 10)
-            
-            # Input Device
-            input_label = wx.StaticText(panel, label="Input Device (Microphone):")
-            input_label.SetForegroundColour(wx.Colour(200, 200, 200))
-            sizer.Add(input_label, 0, wx.ALL, 8)
-            
-            self.input_entries = self.get_input_devices()
-            input_labels = [self._device_label(d) for d in self.input_entries] or ["Default"]
-            self.input_choice = wx.Choice(panel, choices=input_labels)
-            self.input_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
-            self.input_choice.SetForegroundColour(wx.Colour(255, 255, 255))
-            
-            # Load saved input device
-            config = self.load_device_config()
-            selected_input_index = audio_devices.resolve_selected_index(
-                self.input_entries, config, "input_device_index", "input_device"
-            )
-            if selected_input_index is not None:
-                for i, entry in enumerate(self.input_entries):
-                    if entry["index"] == selected_input_index:
-                        self.input_choice.SetSelection(i)
-                        break
-                else:
-                    self.input_choice.SetSelection(0)
+
+        self.notebook.AddPage(panel, "Speech")
+
+    def _build_audio_tab(self):
+        panel, sizer = self._make_tab_panel()
+
+        config = self.load_device_config()
+
+        input_label = wx.StaticText(panel, label="Input Device (Microphone):")
+        input_label.SetForegroundColour(wx.Colour(200, 200, 200))
+        sizer.Add(input_label, 0, wx.ALL, 8)
+
+        self.input_entries = self.get_input_devices()
+        input_labels = [self._device_label(d) for d in self.input_entries] or ["Default"]
+        self.input_choice = wx.Choice(panel, choices=input_labels)
+        self.input_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
+        self.input_choice.SetForegroundColour(wx.Colour(255, 255, 255))
+        selected_input_index = audio_devices.resolve_selected_index(
+            self.input_entries, config, "input_device_index", "input_device"
+        )
+        if selected_input_index is not None:
+            for i, entry in enumerate(self.input_entries):
+                if entry["index"] == selected_input_index:
+                    self.input_choice.SetSelection(i)
+                    break
             else:
                 self.input_choice.SetSelection(0)
-            
-            sizer.Add(self.input_choice, 0, wx.EXPAND | wx.ALL, 8)
-            
-            # Output Device
-            output_label = wx.StaticText(panel, label="Output Device (Speaker):")
-            output_label.SetForegroundColour(wx.Colour(200, 200, 200))
-            sizer.Add(output_label, 0, wx.ALL, 8)
-            
-            self.output_entries = self.get_output_devices()
-            output_labels = [self._device_label(d) for d in self.output_entries] or ["Default"]
-            self.output_choice = wx.Choice(panel, choices=output_labels)
-            self.output_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
-            self.output_choice.SetForegroundColour(wx.Colour(255, 255, 255))
-            
-            # Load saved output device
-            selected_output_index = audio_devices.resolve_selected_index(
-                self.output_entries, config, "output_device_index", "output_device"
-            )
-            if selected_output_index is not None:
-                for i, entry in enumerate(self.output_entries):
-                    if entry["index"] == selected_output_index:
-                        self.output_choice.SetSelection(i)
-                        break
-                else:
-                    self.output_choice.SetSelection(0)
+        else:
+            self.input_choice.SetSelection(0)
+        sizer.Add(self.input_choice, 0, wx.EXPAND | wx.ALL, 8)
+
+        output_label = wx.StaticText(panel, label="Output Device (Speaker):")
+        output_label.SetForegroundColour(wx.Colour(200, 200, 200))
+        sizer.Add(output_label, 0, wx.ALL, 8)
+
+        self.output_entries = self.get_output_devices()
+        output_labels = [self._device_label(d) for d in self.output_entries] or ["Default"]
+        self.output_choice = wx.Choice(panel, choices=output_labels)
+        self.output_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
+        self.output_choice.SetForegroundColour(wx.Colour(255, 255, 255))
+        selected_output_index = audio_devices.resolve_selected_index(
+            self.output_entries, config, "output_device_index", "output_device"
+        )
+        if selected_output_index is not None:
+            for i, entry in enumerate(self.output_entries):
+                if entry["index"] == selected_output_index:
+                    self.output_choice.SetSelection(i)
+                    break
             else:
                 self.output_choice.SetSelection(0)
-            
-            sizer.Add(self.output_choice, 0, wx.EXPAND | wx.ALL, 8)
-            
-            # Test button
-            test_btn = wx.Button(panel, label="Test Audio")
-            test_btn.SetBackgroundColour(wx.Colour(50, 50, 100))
-            test_btn.SetForegroundColour(wx.Colour(255, 255, 255))
-            test_btn.Bind(wx.EVT_BUTTON, self.on_test_audio)
-            sizer.Add(test_btn, 0, wx.EXPAND | wx.ALL, 8)
+        else:
+            self.output_choice.SetSelection(0)
+        sizer.Add(self.output_choice, 0, wx.EXPAND | wx.ALL, 8)
 
-        # Sound Theme Section
+        test_btn = wx.Button(panel, label="Test Audio")
+        test_btn.SetBackgroundColour(wx.Colour(50, 50, 100))
+        test_btn.SetForegroundColour(wx.Colour(255, 255, 255))
+        test_btn.Bind(wx.EVT_BUTTON, self.on_test_audio)
+        sizer.Add(test_btn, 0, wx.EXPAND | wx.ALL, 8)
+
+        self.notebook.AddPage(panel, "Audio")
+
+    def _build_theme_tab(self):
+        panel, sizer = self._make_tab_panel()
+
         theme_label = wx.StaticText(panel, label="Sound Theme:")
         theme_label.SetForegroundColour(wx.Colour(255, 255, 255))
-        theme_label.SetFont(wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
         sizer.Add(theme_label, 0, wx.ALL, 10)
 
         themes = self.api.sounds.get_available_themes()
@@ -153,10 +185,8 @@ class SettingsApp(BlindApp):
         self.theme_choice.Bind(wx.EVT_CHOICE, self.on_theme_preview)
         sizer.Add(self.theme_choice, 0, wx.EXPAND | wx.ALL, 8)
 
-        # Background Music Section
         music_label = wx.StaticText(panel, label="Background Music:")
         music_label.SetForegroundColour(wx.Colour(255, 255, 255))
-        music_label.SetFont(wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
         sizer.Add(music_label, 0, wx.ALL, 10)
 
         self.music_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "music")
@@ -176,24 +206,22 @@ class SettingsApp(BlindApp):
         self._set_music_choice_value(selected_music)
         sizer.Add(self.music_choice, 0, wx.EXPAND | wx.ALL, 8)
 
-        # Update button
+        self.notebook.AddPage(panel, "Theme")
+
+    def _build_updates_tab(self):
+        panel, sizer = self._make_tab_panel()
+
+        info = wx.StaticText(panel, label="Check for updates to keep PyOS up to date.")
+        info.SetForegroundColour(wx.Colour(200, 200, 200))
+        sizer.Add(info, 0, wx.ALL, 15)
+
         update_btn = wx.Button(panel, label="Check for Updates")
         update_btn.SetBackgroundColour(wx.Colour(50, 50, 50))
         update_btn.SetForegroundColour(wx.Colour(255, 255, 255))
         update_btn.Bind(wx.EVT_BUTTON, self.check_updates)
         sizer.Add(update_btn, 0, wx.EXPAND | wx.ALL, 10)
 
-        # Save and Close button
-        close_btn = wx.Button(panel, label="Save and Close")
-        close_btn.SetBackgroundColour(wx.Colour(0, 100, 0))
-        close_btn.SetForegroundColour(wx.Colour(255, 255, 255))
-        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
-        sizer.Add(close_btn, 0, wx.EXPAND | wx.ALL, 15)
-        
-        panel.SetSizer(sizer)
-        self.frame.Bind(wx.EVT_CLOSE, self.on_close)
-        self.frame.Show()
-        self.api.speak("Settings opened. Configure speech and audio devices.")
+        self.notebook.AddPage(panel, "Updates")
 
     def get_input_devices(self):
         """Get list of available input devices."""
