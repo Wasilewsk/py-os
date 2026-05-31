@@ -237,7 +237,8 @@ class ThemeCreatorApp(BlindApp):
         slot_key = self.get_selected_slot_key()
         if slot_key:
             slot_label = self.slot_to_label.get(slot_key, slot_key)
-            self.api.speak(f"{slot_label} selected. {self._assignment_summary(slot_key)}")
+            if not self.api.is_enhanced_mode():
+                self.api.speak(f"{slot_label} selected. {self._assignment_summary(slot_key)}")
 
     def get_selected_slot_key(self):
         if not self.sound_list:

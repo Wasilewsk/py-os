@@ -282,7 +282,7 @@ class AudioRecorderApp(BlindApp):
 
     def on_recording_selected(self, event):
         selected = self.recordings_list.GetStringSelection()
-        if selected:
+        if selected and not self.api.is_enhanced_mode():
             self.api.speak(selected)
 
     def on_recordings_key(self, event):

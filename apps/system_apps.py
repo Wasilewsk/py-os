@@ -578,7 +578,7 @@ class FileExplorerApp(BlindApp):
 
     def on_item_focused(self, event):
         index = event.GetIndex()
-        if 0 <= index < len(self.items):
+        if not self.api.is_enhanced_mode() and 0 <= index < len(self.items):
             name, is_dir = self.items[index]
             item_type = "Folder" if is_dir else "File"
             self.api.speak(f"{name}, {item_type}", interrupt=False)

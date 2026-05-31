@@ -163,7 +163,8 @@ class YouTubePlayerApp(BlindApp):
         if sel != wx.NOT_FOUND and sel < len(self.search_results):
             label, _, title = self.search_results[sel]
             self.current_title = title
-            self.api.speak(label)
+            if not self.api.is_enhanced_mode():
+                self.api.speak(label)
 
     def on_play(self, event):
         if not HAS_YTDLP:

@@ -102,7 +102,8 @@ class MessagesApp(BlindApp):
 
     def on_item_focused(self, event):
         item = self.msg_list.GetStringSelection()
-        self.api.speak(item)
+        if not self.api.is_enhanced_mode():
+            self.api.speak(item)
 
     def on_close(self, event=None):
         self.api.message_service.unsubscribe(self.add_message)

@@ -88,7 +88,8 @@ class HelpApp(BlindApp):
 
     def on_select(self, event):
         topic = self.list.GetStringSelection()
-        self.api.speak(topic)
+        if not self.api.is_enhanced_mode():
+            self.api.speak(topic)
 
     def on_read(self, event):
         topic = self.list.GetStringSelection()
