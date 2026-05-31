@@ -78,6 +78,7 @@ class AudioRecorderApp(BlindApp):
         filename_label.SetForegroundColour(wx.Colour(255, 255, 255))
         sizer.Add(filename_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
         self.filename_input = wx.TextCtrl(panel)
+        self.filename_input.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("Recording filename"), e.Skip()))
         sizer.Add(self.filename_input, 0, wx.EXPAND | wx.ALL, 10)
 
         self.duration_label = wx.StaticText(panel, label="Duration: 0 seconds")
@@ -107,6 +108,7 @@ class AudioRecorderApp(BlindApp):
         sizer.Add(files_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
         file_row = wx.BoxSizer(wx.HORIZONTAL)
         self.path_input = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
+        self.path_input.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("Audio file path"), e.Skip()))
         self.path_input.Bind(wx.EVT_TEXT_ENTER, self.on_load_path)
         browse_btn = wx.Button(panel, label="Browse...")
         browse_btn.Bind(wx.EVT_BUTTON, self.on_browse_file)
@@ -134,6 +136,8 @@ class AudioRecorderApp(BlindApp):
         sizer.Add(list_label, 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
         self.recordings_list = wx.ListBox(panel)
         self.recordings_list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_open_selected_recording)
+        self.recordings_list.Bind(wx.EVT_LISTBOX, self.on_recording_selected)
+        self.recordings_list.Bind(wx.EVT_KEY_DOWN, self.on_recordings_key)
         sizer.Add(self.recordings_list, 1, wx.EXPAND | wx.ALL, 10)
         self.refresh_recordings_list()
 
@@ -154,6 +158,8 @@ class AudioRecorderApp(BlindApp):
                 self.on_stop_recording()
             else:
                 self.on_start_recording()
+        elif event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.on_close()
         else:
             event.Skip()
 
@@ -215,6 +221,8 @@ class AudioRecorderApp(BlindApp):
         if self.is_recording:
             self.recording_time += 1
             wx.CallAfter(self.duration_label.SetLabel, f"Duration: {self.recording_time} seconds")
+            if self.recording_time % 10 == 0:
+                wx.CallAfter(self.api.speak, f"Recording, {self.recording_time} seconds")
             threading.Timer(1.0, self._update_duration).start()
 
     def on_stop_recording(self, event=None):
@@ -271,6 +279,25 @@ class AudioRecorderApp(BlindApp):
                 self.recordings_list.Append(name)
         except Exception:
             pass
+
+    def on_recording_selected(self, event):
+        selected = self.recordings_list.GetStringSelection()
+        if selected:
+            self.api.speak(selected)
+
+    def on_recordings_key(self, event):
+        if event.GetKeyCode() == wx.WXK_DELETE:
+            selected = self.recordings_list.GetStringSelection()
+            if selected:
+                full = os.path.join(self.recordings_dir, selected)
+                try:
+                    os.remove(full)
+                    self.refresh_recordings_list()
+                    self.api.speak(f"Deleted {selected}")
+                except Exception as e:
+                    self.api.speak(f"Could not delete: {e}")
+        else:
+            event.Skip()
 
     def on_open_selected_recording(self, event=None):
         selected = self.recordings_list.GetStringSelection()

@@ -13,6 +13,9 @@ class TimerApp(BlindApp):
         self.help_text = "Enter seconds and press Enter. The app will alert you when done."
         self.docs = "Timer runs in the background and plays an alarm after the specified duration."
         self.auto_closing_after_finish = False
+        self.cancel_btn = None
+        self.timer_running = False
+        self.timer_seconds = 0
 
     def run(self):
         self.frame = wx.Frame(None, title="Timer", size=(300, 200))
@@ -23,11 +26,16 @@ class TimerApp(BlindApp):
         label.SetForegroundColour(wx.Colour(255, 255, 255))
         sizer.Add(label, 0, wx.ALL | wx.CENTER, 10)
         self.input_ctrl = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
+        self.input_ctrl.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("Enter seconds"), e.Skip()))
         sizer.Add(self.input_ctrl, 0, wx.EXPAND | wx.ALL, 10)
         start_btn = wx.Button(panel, label="Start Timer")
+        self.cancel_btn = wx.Button(panel, label="Cancel Timer")
+        self.cancel_btn.Disable()
         sizer.Add(start_btn, 0, wx.ALL | wx.CENTER, 10)
+        sizer.Add(self.cancel_btn, 0, wx.ALL | wx.CENTER, 10)
         panel.SetSizer(sizer)
         start_btn.Bind(wx.EVT_BUTTON, self.on_start)
+        self.cancel_btn.Bind(wx.EVT_BUTTON, self.on_cancel)
         self.input_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_start)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
         self.frame.Show()
@@ -38,19 +46,38 @@ class TimerApp(BlindApp):
         val = self.input_ctrl.GetValue()
         try:
             seconds = int(val)
+            self.timer_running = True
+            self.timer_seconds = seconds
+            self.cancel_btn.Enable()
             self.api.speak(f"Timer started for {seconds} seconds.")
             threading.Thread(target=self.run_timer, args=(seconds,), daemon=True).start()
             self.frame.Hide()
         except ValueError:
             self.api.speak("Error: Please enter a valid number.")
 
+    def on_cancel(self, event):
+        self.timer_running = False
+        self.input_ctrl.Enable()
+        self.cancel_btn.Disable()
+        self.frame.Show()
+        self.api.speak("Timer cancelled.")
+
     def run_timer(self, seconds):
-        time.sleep(seconds)
-        wx.CallAfter(self._finish_timer)
+        elapsed = 0
+        while elapsed < seconds and self.timer_running:
+            remaining = seconds - elapsed
+            if remaining > 0 and remaining % 10 == 0:
+                wx.CallAfter(self.api.speak, f"{remaining} seconds remaining")
+            time.sleep(1)
+            elapsed += 1
+        if self.timer_running:
+            wx.CallAfter(self._finish_timer)
 
     def _finish_timer(self):
+        self.timer_running = False
         self.api.speak("Timer finished!")
         self.api.play_sound("timer")
+        self.cancel_btn.Disable()
         self.auto_closing_after_finish = True
         wx.CallLater(1200, lambda: self.on_close(play_close_sound=False))
 
@@ -93,6 +120,7 @@ class RemindersApp(BlindApp):
         panel.SetBackgroundColour(wx.Colour(0, 0, 0))
         sizer = wx.BoxSizer(wx.VERTICAL)
         self.input_ctrl = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
+        self.input_ctrl.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("New reminder text"), e.Skip()))
         sizer.Add(self.input_ctrl, 0, wx.EXPAND | wx.ALL, 10)
         add_btn = wx.Button(panel, label="Add Reminder")
         sizer.Add(add_btn, 0, wx.ALL | wx.CENTER, 5)

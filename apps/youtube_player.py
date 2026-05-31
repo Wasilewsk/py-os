@@ -50,6 +50,7 @@ class YouTubePlayerApp(BlindApp):
         self.url_input = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
         self.url_input.SetBackgroundColour(wx.Colour(30, 30, 30))
         self.url_input.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.url_input.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("YouTube URL or search query"), e.Skip()))
         input_row.Add(self.url_input, 1, wx.EXPAND)
 
         search_btn = wx.Button(panel, label="Search")
@@ -83,6 +84,7 @@ class YouTubePlayerApp(BlindApp):
         sizer.Add(btn_row, 0, wx.EXPAND | wx.ALL, 10)
 
         panel.SetSizer(sizer)
+        self.frame.Bind(wx.EVT_CHAR_HOOK, self.on_frame_key)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
         self.frame.Show()
         self.api.speak("YouTube Player opened. Enter a URL or search query.")
@@ -233,6 +235,12 @@ class YouTubePlayerApp(BlindApp):
         if event:
             self.api.speak("Playback stopped.")
             self.status_lbl.SetLabel("Status: Stopped")
+
+    def on_frame_key(self, event):
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.on_close()
+        else:
+            event.Skip()
 
     def on_close(self, event=None):
         self.on_stop()

@@ -210,6 +210,7 @@ class OOBEWizard(wx.Frame):
         self.content_sizer.Add(lbl, 0, wx.LEFT, 10)
         
         self.name_input = wx.TextCtrl(self.panel)
+        self.name_input.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("Name input"), e.Skip()))
         self.content_sizer.Add(self.name_input, 0, wx.EXPAND | wx.ALL, 10)
         
         btn = wx.Button(self.panel, label="Next")
@@ -238,6 +239,7 @@ class OOBEWizard(wx.Frame):
         self.content_sizer.Add(lbl, 0, wx.LEFT, 10)
         
         self.pass_input = wx.TextCtrl(self.panel, style=wx.TE_PASSWORD)
+        self.pass_input.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("Password input"), e.Skip()))
         self.content_sizer.Add(self.pass_input, 0, wx.EXPAND | wx.ALL, 10)
         
         lbl2 = wx.StaticText(self.panel, label="Confirm password:")
@@ -275,6 +277,7 @@ class OOBEWizard(wx.Frame):
         self.acc_check = wx.CheckBox(self.panel, label="Use screen reader enhanced mode")
         self.acc_check.SetForegroundColour(wx.Colour(255, 255, 255))
         self.acc_check.SetValue(True)
+        self.acc_check.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak(f"Use screen reader enhanced mode, checkbox {'checked' if self.acc_check.GetValue() else 'unchecked'}"), e.Skip()))
         self.content_sizer.Add(self.acc_check, 0, wx.ALL, 10)
         
         btn = wx.Button(self.panel, label="Next")

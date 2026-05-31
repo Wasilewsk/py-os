@@ -26,7 +26,8 @@ venv/
 
 # Other common ignores
 *.zip
-# Local status scratchpad
+*.7z
+*.rar
 PILessstatus.txt
 
 # Data directory

@@ -481,6 +481,7 @@ class FileExplorerApp(BlindApp):
         self.address_bar = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
         self.address_bar.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.address_bar.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.address_bar.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak(f"Address: {self.address_bar.GetValue()}"), e.Skip()))
 
         nav_sizer.Add(self.back_button, 0, wx.ALL, 5)
         nav_sizer.Add(self.up_button, 0, wx.ALL, 5)
@@ -514,6 +515,7 @@ class FileExplorerApp(BlindApp):
         self.up_button.Bind(wx.EVT_BUTTON, self.go_up)
         self.address_bar.Bind(wx.EVT_TEXT_ENTER, self.go_to_address)
         self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
+        self.list.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.on_item_focused)
         self.list.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         refresh_btn.Bind(wx.EVT_BUTTON, lambda e: self.refresh_files())
         close_btn.Bind(wx.EVT_BUTTON, self.on_close)
@@ -574,6 +576,13 @@ class FileExplorerApp(BlindApp):
         else:
             self.api.speak("Invalid path.")
 
+    def on_item_focused(self, event):
+        index = event.GetIndex()
+        if 0 <= index < len(self.items):
+            name, is_dir = self.items[index]
+            item_type = "Folder" if is_dir else "File"
+            self.api.speak(f"{name}, {item_type}", interrupt=False)
+
     def on_item_activated(self, event):
         index = event.GetIndex()
         name, is_dir = self.items[index]
@@ -582,17 +591,17 @@ class FileExplorerApp(BlindApp):
         if is_dir:
             self.go_to_path(full_path)
         else:
-                self.api.speak(f"Opening {name}", interrupt=False)
-                lower = name.lower()
-                if lower.endswith((".txt", ".md", ".log", ".json", ".py", ".csv")):
-                    self.api.launch_app("TextEditorApp", file_path=full_path)
-                elif lower.endswith((".wav", ".mp3", ".ogg", ".flac")):
-                    self.api.launch_app("AudioRecorderApp", file_path=full_path)
-                else:
-                    try:
-                        open_external_file(full_path)
-                    except Exception as e:
-                        self.api.speak(f"Could not open file: {e}")
+            self.api.speak(f"Opening {name}", interrupt=False)
+            lower = name.lower()
+            if lower.endswith((".txt", ".md", ".log", ".json", ".py", ".csv")):
+                self.api.launch_app("TextEditorApp", file_path=full_path)
+            elif lower.endswith((".wav", ".mp3", ".ogg", ".flac")):
+                self.api.launch_app("AudioRecorderApp", file_path=full_path)
+            else:
+                try:
+                    open_external_file(full_path)
+                except Exception as e:
+                    self.api.speak(f"Could not open file: {e}")
 
     def on_key_down(self, event):
         keycode = event.GetKeyCode()
@@ -644,6 +653,7 @@ class CalculatorApp(BlindApp):
         self.input_ctrl = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
         self.input_ctrl.SetBackgroundColour(wx.Colour(30, 30, 30))
         self.input_ctrl.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.input_ctrl.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("Expression input"), e.Skip()))
         sizer.Add(self.input_ctrl, 1, wx.EXPAND | wx.ALL, 10)
         
         panel.SetSizer(sizer)
@@ -698,11 +708,12 @@ class TextEditorApp(BlindApp):
         super().__init__(api)
         self.name = "Text Editor"
         self.description = "A simple text editor."
-        self.help_text = "Use standard text editing shortcuts. Save or Open files."
+        self.help_text = "Use standard text editing shortcuts. Save or Open files. F2 reads current line. Ctrl+F to find text."
         self.docs = "The Text Editor allows you to create, open, edit, and save text files."
         self.frame = None
         self.text_ctrl = None
         self.current_file_path = None
+        self.status_bar = None
 
     def run(self, file_path=None):
         self.frame = wx.Frame(None, title="Text Editor", size=(600, 500))
@@ -717,10 +728,12 @@ class TextEditorApp(BlindApp):
         main_sizer.Add(self.text_ctrl, 1, wx.EXPAND | wx.ALL, 5)
         
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        new_btn = wx.Button(panel, label="New")
         open_btn = wx.Button(panel, label="Open")
         save_btn = wx.Button(panel, label="Save")
         close_btn = wx.Button(panel, label="Close")
         
+        button_sizer.Add(new_btn, 0, wx.ALL, 5)
         button_sizer.Add(open_btn, 0, wx.ALL, 5)
         button_sizer.Add(save_btn, 0, wx.ALL, 5)
         button_sizer.AddStretchSpacer(1)
@@ -728,11 +741,18 @@ class TextEditorApp(BlindApp):
         
         main_sizer.Add(button_sizer, 0, wx.EXPAND | wx.ALL, 5)
         
+        self.status_bar = wx.StaticText(panel, label="")
+        self.status_bar.SetForegroundColour(wx.Colour(180, 180, 180))
+        main_sizer.Add(self.status_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+        
         panel.SetSizer(main_sizer)
         
+        new_btn.Bind(wx.EVT_BUTTON, self.on_new)
         open_btn.Bind(wx.EVT_BUTTON, self.on_open)
         save_btn.Bind(wx.EVT_BUTTON, self.on_save)
         close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        self.text_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_text_key)
+        self.frame.Bind(wx.EVT_CHAR_HOOK, self.on_frame_key)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
         
         self.frame.Show()
@@ -781,6 +801,57 @@ class TextEditorApp(BlindApp):
                 self.api.speak(f"File saved as: {os.path.basename(self.current_file_path)}")
             except Exception as e:
                 self.api.speak(f"Error saving file: {e}")
+        dialog.Destroy()
+
+    def on_new(self, event):
+        self.text_ctrl.SetValue("")
+        self.current_file_path = None
+        self.frame.SetTitle("Text Editor")
+        self.status_bar.SetLabel("")
+        self.text_ctrl.SetFocus()
+        self.api.speak("New document created.")
+
+    def on_text_key(self, event):
+        key = event.GetKeyCode()
+        nav_keys = {wx.WXK_UP, wx.WXK_DOWN, wx.WXK_LEFT, wx.WXK_RIGHT, wx.WXK_PAGEUP, wx.WXK_PAGEDOWN, wx.WXK_HOME, wx.WXK_END}
+        if key in nav_keys:
+            wx.CallAfter(self._speak_cursor_position)
+        event.Skip()
+
+    def on_frame_key(self, event):
+        key = event.GetKeyCode()
+        if key == wx.WXK_F2:
+            col, line = self.text_ctrl.PositionToXY(self.text_ctrl.GetInsertionPoint())
+            if line >= 0:
+                line_text = self.text_ctrl.GetLineText(line)
+                if line_text.strip():
+                    self.api.speak(f"Line {line + 1}: {line_text}")
+                else:
+                    self.api.speak(f"Line {line + 1} is empty")
+            return
+        elif key == ord('F') and event.ControlDown():
+            self.on_find()
+            return
+        event.Skip()
+
+    def _speak_cursor_position(self):
+        col, line = self.text_ctrl.PositionToXY(self.text_ctrl.GetInsertionPoint())
+        if col >= 0 and line >= 0:
+            self.api.speak(f"Line {line + 1}, Column {col + 1}", interrupt=False)
+            self.status_bar.SetLabel(f"Line {line + 1}, Col {col + 1}")
+
+    def on_find(self):
+        dialog = wx.TextEntryDialog(self.frame, "Enter search text:", "Find")
+        if dialog.ShowModal() == wx.ID_OK:
+            search_text = dialog.GetValue()
+            if search_text:
+                content = self.text_ctrl.GetValue()
+                count = content.count(search_text)
+                idx = content.find(search_text)
+                if idx >= 0:
+                    self.text_ctrl.SetSelection(idx, idx + len(search_text))
+                    self.text_ctrl.SetFocus()
+                self.api.speak(f"Found {count} matches")
         dialog.Destroy()
 
     def on_close(self, event=None):

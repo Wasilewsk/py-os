@@ -25,6 +25,7 @@ class MessagesApp(BlindApp):
         self.ip_input.SetBackgroundColour(wx.Colour(30, 30, 30))
         self.ip_input.SetForegroundColour(wx.Colour(255, 255, 255))
         self.ip_input.SetHelpText("Enter the IP address of the recipient.")
+        self.ip_input.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("To IP address"), e.Skip()))
         
         target_sizer.Add(lbl, 0, wx.ALL | wx.CENTER, 5)
         target_sizer.Add(self.ip_input, 1, wx.EXPAND | wx.ALL, 5)
@@ -50,6 +51,7 @@ class MessagesApp(BlindApp):
         self.send_input.SetBackgroundColour(wx.Colour(30, 30, 30))
         self.send_input.SetForegroundColour(wx.Colour(255, 255, 255))
         self.send_input.SetHelpText("Type your message here and press Enter to send.")
+        self.send_input.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak("Message text"), e.Skip()))
         main_sizer.Add(self.send_input, 0, wx.EXPAND | wx.ALL, 10)
         
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
