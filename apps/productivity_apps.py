@@ -162,3 +162,131 @@ class RemindersApp(BlindApp):
                 self.api.speak(f"Deleted: {text}")
         else:
             event.Skip()
+
+class StopwatchApp(BlindApp):
+    def __init__(self, api):
+        super().__init__(api)
+        self.name = "Stopwatch"
+        self.description = "Count elapsed time with lap support."
+        self.help_text = "Press Start/Stop or Space to toggle. L key records a lap. R key resets."
+        self.docs = "Stopwatch tracks elapsed time and supports recording lap times."
+        self.running = False
+        self.elapsed = 0
+        self.lap_count = 0
+        self.lap_times = []
+        self.stopwatch_thread = None
+
+    def run(self):
+        self.frame = wx.Frame(None, title="Stopwatch", size=(350, 450))
+        panel = wx.Panel(self.frame)
+        panel.SetBackgroundColour(wx.Colour(0, 0, 0))
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        title = wx.StaticText(panel, label="Stopwatch")
+        title.SetForegroundColour(wx.Colour(255, 255, 255))
+        title.SetFont(wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        sizer.Add(title, 0, wx.ALL | wx.CENTER, 12)
+
+        self.time_display = wx.StaticText(panel, label="00:00")
+        self.time_display.SetForegroundColour(wx.Colour(0, 255, 0))
+        self.time_display.SetFont(wx.Font(28, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        sizer.Add(self.time_display, 0, wx.ALL | wx.CENTER, 15)
+
+        btn_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.start_stop_btn = wx.Button(panel, label="Start")
+        self.lap_reset_btn = wx.Button(panel, label="Lap")
+        self.lap_reset_btn.Disable()
+        btn_row.Add(self.start_stop_btn, 1, wx.EXPAND | wx.ALL, 5)
+        btn_row.Add(self.lap_reset_btn, 1, wx.EXPAND | wx.ALL, 5)
+        sizer.Add(btn_row, 0, wx.EXPAND | wx.ALL, 10)
+
+        close_btn = wx.Button(panel, label="Close")
+        sizer.Add(close_btn, 0, wx.ALL | wx.CENTER, 10)
+
+        lap_label = wx.StaticText(panel, label="Lap Times:")
+        lap_label.SetForegroundColour(wx.Colour(200, 200, 200))
+        sizer.Add(lap_label, 0, wx.LEFT | wx.RIGHT, 10)
+
+        self.lap_list = wx.ListBox(panel, style=wx.LB_SINGLE)
+        self.lap_list.SetBackgroundColour(wx.Colour(20, 20, 20))
+        self.lap_list.SetForegroundColour(wx.Colour(255, 255, 255))
+        sizer.Add(self.lap_list, 1, wx.EXPAND | wx.ALL, 10)
+
+        panel.SetSizer(sizer)
+
+        self.start_stop_btn.Bind(wx.EVT_BUTTON, self.on_start_stop)
+        self.lap_reset_btn.Bind(wx.EVT_BUTTON, self.on_lap_reset)
+        close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        self.frame.Bind(wx.EVT_CHAR_HOOK, self.on_frame_key)
+        self.frame.Bind(wx.EVT_CLOSE, self.on_close)
+
+        self.frame.Show()
+        self.api.speak("Stopwatch opened. Press Start to begin.")
+        self.start_stop_btn.SetFocus()
+
+    def on_frame_key(self, event):
+        key = event.GetKeyCode()
+        if key == wx.WXK_SPACE:
+            self.on_start_stop()
+        elif key in (ord('L'), ord('l')):
+            self.on_lap_reset()
+        elif key in (ord('R'), ord('r')):
+            self.on_lap_reset()
+        else:
+            event.Skip()
+
+    def on_start_stop(self, event=None):
+        if not self.running:
+            self.running = True
+            self.start_stop_btn.SetLabel("Stop")
+            self.lap_reset_btn.SetLabel("Lap")
+            self.lap_reset_btn.Enable()
+            self.stopwatch_thread = threading.Thread(target=self._run_stopwatch, daemon=True)
+            self.stopwatch_thread.start()
+            self.api.speak("Stopwatch started.")
+        else:
+            self.running = False
+            self.start_stop_btn.SetLabel("Start")
+            self.lap_reset_btn.SetLabel("Reset")
+            self.api.speak(f"Stopwatch stopped at {self._format_time(self.elapsed)}.")
+
+    def on_lap_reset(self, event=None):
+        if self.running:
+            self.lap_count += 1
+            self.lap_times.append(self.elapsed)
+            lap_str = f"Lap {self.lap_count}: {self._format_time(self.elapsed)}"
+            self.lap_list.Append(lap_str)
+            self.lap_list.SetSelection(self.lap_list.GetCount() - 1)
+            self.api.speak(lap_str)
+        else:
+            self.elapsed = 0
+            self.lap_count = 0
+            self.lap_times = []
+            self.lap_list.Clear()
+            self.time_display.SetLabel("00:00")
+            self.lap_reset_btn.SetLabel("Lap")
+            self.lap_reset_btn.Disable()
+            self.api.speak("Stopwatch reset.")
+
+    def _run_stopwatch(self):
+        while self.running:
+            time.sleep(1)
+            self.elapsed += 1
+            wx.CallAfter(self._update_display)
+            if self.elapsed % 10 == 0:
+                wx.CallAfter(self.api.speak, self._format_time(self.elapsed))
+
+    def _update_display(self):
+        self.time_display.SetLabel(self._format_time(self.elapsed))
+
+    def _format_time(self, total_seconds):
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        return f"{minutes:02d}:{seconds:02d}"
+
+    def on_close(self, event=None):
+        self.running = False
+        if self.frame:
+            self.frame.Destroy()
+        self.api.sounds.play("close")
+        self.api.desktop.on_app_closed(self)
