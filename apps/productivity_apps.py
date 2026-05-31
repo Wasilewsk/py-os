@@ -10,6 +10,7 @@ class TimerApp(BlindApp):
         super().__init__(api)
         self.name = "Timer"
         self.description = "Set a simple countdown timer."
+        self.category = "Productivity"
         self.help_text = "Enter seconds and press Enter. The app will alert you when done."
         self.docs = "Timer runs in the background and plays an alarm after the specified duration."
         self.auto_closing_after_finish = False
@@ -95,6 +96,7 @@ class RemindersApp(BlindApp):
         super().__init__(api)
         self.name = "Reminders"
         self.description = "Save and hear your reminders."
+        self.category = "Productivity"
         self.help_text = "Type a reminder and press Enter to save. Use arrows to browse saved reminders."
         self.docs = "Reminders are stored in the app data folder and persist between sessions."
         self.db_path = self.api.get_data_path("reminders.json")
@@ -169,6 +171,7 @@ class StopwatchApp(BlindApp):
         super().__init__(api)
         self.name = "Stopwatch"
         self.description = "Count elapsed time with lap support."
+        self.category = "Productivity"
         self.help_text = "Space to start/stop. L for lap. R for reset."
         self.docs = "Stopwatch tracks elapsed time with lap recording. Laps spoken on record and when navigating with arrow keys."
         self.running = False

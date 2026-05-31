@@ -19,6 +19,7 @@ class YouTubePlayerApp(BlindApp):
         super().__init__(api)
         self.name = "YouTube Player"
         self.description = "Search and play YouTube videos using yt-dlp."
+        self.category = "Media"
         self.help_text = "Enter a YouTube URL or search query, select a result, and press Play. Use Stop to end playback."
         self.docs = "Uses yt-dlp to fetch video info and audio streams. Plays audio via ffplay. Requires yt-dlp installed (pip install yt-dlp)."
         self.ffplay_path = shutil.which("ffplay")

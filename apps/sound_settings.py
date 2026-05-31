@@ -11,6 +11,7 @@ class ThemeCreatorApp(BlindApp):
         super().__init__(api)
         self.name = "Theme Creator"
         self.description = "Create a new sound theme or open an existing one to edit."
+        self.category = "System"
         self.help_text = "Choose Create New Theme or Open Theme. In the editor, select a sound or background music slot, browse for a file, and save."
         self.docs = (
             "Theme Creator lets you create and edit themes for the existing sound slots: "

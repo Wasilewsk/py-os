@@ -11,6 +11,7 @@ class AssistantApp(BlindApp):
         super().__init__(api)
         self.name = "AI Assistant"
         self.description = "Voice-enabled assistant powered by Ollama."
+        self.category = "Tools"
         self.help_text = "Select a model, type a question and press Enter. The assistant will speak the answer."
         self.docs = "AI Assistant uses a local Ollama server to provide intelligent responses. You can choose from installed models."
         self.model = "llama3"

@@ -23,6 +23,7 @@ class SettingsApp(BlindApp):
         super().__init__(api)
         self.name = "System Settings"
         self.description = "Configure speech, audio devices, themes, and updates."
+        self.category = "System"
         self.help_text = "Use Tab to navigate between tabs and controls. Switch tabs with Ctrl+Tab."
         self.docs = "Settings lets you adjust speech rate, choose a speech backend, configure audio devices, and manage sound themes."
         self.device_config_path = self.api.get_data_path("device_config.json")
@@ -203,6 +204,7 @@ class SettingsApp(BlindApp):
         self.music_choice = wx.Choice(panel, choices=[self._music_choice_label(value) for value in self.music_choice_values])
         self.music_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
         self.music_choice.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.music_choice.Bind(wx.EVT_CHOICE, self.on_music_changed)
         self.music_config_path = self.api.sounds.music_config_path
         selected_music = self.api.sounds.load_background_music()
         self._set_music_choice_value(selected_music)
@@ -335,6 +337,13 @@ class SettingsApp(BlindApp):
                 json.dump(config, f)
         except Exception:
             pass
+
+    def on_music_changed(self, event):
+        selected_music = self._get_selected_music_value()
+        self.api.sounds.save_background_music(selected_music)
+        self._save_music_volume()
+        name = selected_music.replace(".aif", "").replace(".wav", "").replace("_", " ").strip()
+        self.api.speak(f"Music: {name}" if name != "None" else "Music: None")
 
     def _apply_speech_mode_selection(self, announce=True):
         sel = self.speech_choice.GetSelection()
@@ -487,6 +496,7 @@ class FileExplorerApp(BlindApp):
         super().__init__(api)
         self.name = "File Explorer"
         self.description = "Browse your files."
+        self.category = "System"
         self.help_text = "Use Arrow keys to navigate, Enter to open, and Backspace to go up."
         self.docs = "File Explorer allows you to browse the host file system."
         self.current_dir = os.getcwd()
@@ -649,6 +659,7 @@ class ClockApp(BlindApp):
         super().__init__(api)
         self.name = "Clock"
         self.description = "Check the current time and date."
+        self.category = "System"
         self.help_text = "This app announces the time and closes automatically."
         self.docs = "Clock provides current system time and date information."
 
@@ -665,6 +676,7 @@ class CalculatorApp(BlindApp):
         super().__init__(api)
         self.name = "Calculator"
         self.description = "Basic math calculator with calculation history."
+        self.category = "System"
         self.help_text = "Type an expression like '2 + 2' and press Enter. Use Up/Down arrows to review past calculations."
         self.docs = "Calculator supports basic arithmetic: addition (+), subtraction (-), multiplication (*), and division (/)."
         self.history = []
@@ -735,6 +747,7 @@ class TextEditorApp(BlindApp):
         super().__init__(api)
         self.name = "Text Editor"
         self.description = "A simple text editor."
+        self.category = "System"
         self.help_text = "Use standard text editing shortcuts. Save or Open files. F2 reads current line. Ctrl+F to find text."
         self.docs = "The Text Editor allows you to create, open, edit, and save text files."
         self.frame = None

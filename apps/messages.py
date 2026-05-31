@@ -7,6 +7,7 @@ class MessagesApp(BlindApp):
         super().__init__(api)
         self.name = "Messages"
         self.description = "Send and receive text messages over the network."
+        self.category = "Communication"
         self.help_text = "Tab to navigate. Enter IP address in 'To' field, type message in 'Message' field, and press Enter or Click Send."
         self.docs = "This app uses the system-wide Message Service on port 3030. Messages are announced even when this app is closed."
 

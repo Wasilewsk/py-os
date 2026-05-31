@@ -33,6 +33,7 @@ class AudioRecorderApp(BlindApp):
         super().__init__(api)
         self.name = "Media Studio"
         self.description = "Record and play audio files."
+        self.category = "Media"
         self.help_text = "Use Start/Stop to record, Save to store clips, and Play/Pause/Stop to listen."
         self.docs = "Media Studio records from your selected microphone and plays recordings or chosen audio files."
         self.sample_rate = 44100

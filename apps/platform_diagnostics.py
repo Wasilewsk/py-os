@@ -8,6 +8,7 @@ class PlatformDiagnosticsApp(BlindApp):
         super().__init__(api)
         self.name = "Platform Diagnostics"
         self.description = "Inspect platform support, speech backends, shells, and optional dependencies."
+        self.category = "System"
         self.help_text = "Use Refresh to rescan support, and Read Summary to hear the current report."
         self.docs = (
             "Platform Diagnostics shows which speech backends, audio helpers, host shells, and "

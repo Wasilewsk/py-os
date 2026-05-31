@@ -33,6 +33,7 @@ class EncryptionApp(BlindApp):
         super().__init__(api)
         self.name = "Encryption"
         self.description = "Encrypt or decrypt files with a password."
+        self.category = "Tools"
         self.help_text = "Select a file, choose Encrypt or Decrypt, enter a password, then press Run."
         self.docs = "Encryption uses PBKDF2 key derivation with HMAC-SHA256 stream cipher and integrity verification. Encrypted files have a .pyos-enc extension."
         self.progress_dialog = None

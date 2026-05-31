@@ -15,6 +15,7 @@ class BlindApp:
         self.api = api
         self.name = "Abstract App"
         self.description = "Base application class"
+        self.category = "General"
         self.help_text = "No help available for this app."
         self.docs = "No documentation available."
         self.frame = None

@@ -7,6 +7,7 @@ class HelpApp(BlindApp):
         super().__init__(api)
         self.name = "Help and Documentation"
         self.description = "Learn how to use PyOS and create your own apps."
+        self.category = "Tools"
         self.help_text = "Use the list to select a topic and press Enter to read it."
         self.docs = "This app provides comprehensive guides for both users and developers of PyOS."
         
