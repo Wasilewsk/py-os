@@ -8,6 +8,55 @@ import time
 
 OOBE_MUSIC = "1996 Internet Starter Kit - Velkommen - Original Mix.wav"
 
+
+def run_text_mode_update(data_dir):
+    from speech import engine
+    state_path = os.path.join(data_dir, "update_state.json")
+    try:
+        with open(state_path, "r") as f:
+            state = json.load(f)
+    except Exception:
+        return
+
+    if state.get("phase") != 1:
+        return
+
+    sys.stdout.write("\033[2J\033[H\033[44;37m")
+    for r in range(1, 25):
+        sys.stdout.write(f"\033[{r};1H" + " " * 80)
+
+    lines = [
+        "PyOS Update",
+        "",
+        "Setup is starting the update.",
+        "",
+        "Do not unplug your computer.",
+        "",
+    ]
+    for i, line in enumerate(lines):
+        offset = 10 + i
+        padding = (80 - len(line)) // 2
+        sys.stdout.write(f"\033[{offset};1H" + " " * padding + line + " " * (80 - len(line) - padding))
+
+    sys.stdout.write("\033[24;1H\033[47;30m" + " " * 80)
+    sys.stdout.flush()
+    engine.speak("Setup is starting the update. Do not unplug your computer.")
+
+    for i in range(20, 0, -1):
+        bar = "[" + "#" * min(20 - i, 20) + " " * i + "]"
+        sys.stdout.write(f"\033[18;30H{bar} {20 - i}/20")
+        sys.stdout.flush()
+        time.sleep(1)
+
+    state["phase"] = 2
+    with open(state_path, "w") as f:
+        json.dump(state, f)
+
+    sys.stdout.write("\033[0m\033[2J\033[H")
+    sys.stdout.flush()
+    subprocess.Popen([sys.executable, os.path.join(os.getcwd(), "desktop.py")], cwd=os.getcwd())
+    sys.exit(0)
+
 class UpdateWizard(wx.Frame):
     def __init__(self, api, state_path, on_finish):
         super().__init__(None, title="PyOS Update", size=(650, 450),
@@ -51,9 +100,7 @@ class UpdateWizard(wx.Frame):
         self.Centre()
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
-        if self.phase == 1:
-            self._play_oobe_music()
-
+        self._play_oobe_music()
         self._run_phase()
 
     def _play_oobe_music(self):
@@ -70,9 +117,7 @@ class UpdateWizard(wx.Frame):
         threading.Thread(target=self._do_phase, daemon=True).start()
 
     def _do_phase(self):
-        if self.phase == 1:
-            self._phase_install()
-        elif self.phase == 2:
+        if self.phase == 2:
             self._phase_getting_ready(1)
         elif self.phase == 3:
             self._phase_getting_ready(2)
@@ -86,34 +131,6 @@ class UpdateWizard(wx.Frame):
 
     def _set_progress(self, val):
         wx.CallAfter(self.progress.SetValue, val)
-
-    def _phase_install(self):
-        self._set_ui("Please wait while PyOS updates your system",
-                      "Configuring updates...",
-                      "Do not turn off your computer.")
-        bars = [
-            ("Installing update 1 of 3...", 30),
-            ("Installing update 2 of 3...", 60),
-            ("Installing update 3 of 3...", 100),
-        ]
-        total_sec = 50
-        steps = 100
-        for i in range(steps + 1):
-            if self._cancelled:
-                return
-            pct = int(i * 100 / steps)
-            self._set_progress(pct)
-
-            elapsed_ratio = i / steps
-            for label, threshold in bars:
-                if pct <= threshold:
-                    wx.CallAfter(self.sub_msg.SetLabel, label)
-                    break
-
-            time.sleep(total_sec / steps)
-
-        self.state["phase"] = 2
-        self._save_and_reboot()
 
     def _phase_getting_ready(self, num):
         self._set_ui("Getting ready...",

@@ -596,6 +596,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     run_text_mode_setup()
+    from update_wizard import run_text_mode_update
+    run_text_mode_update(get_data_dir())
     app = wx.App()
     controller = PyOSController()
     controller.start()
