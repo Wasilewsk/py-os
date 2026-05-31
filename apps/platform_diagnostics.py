@@ -42,15 +42,19 @@ class PlatformDiagnosticsApp(BlindApp):
         self.report_ctrl.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.report_ctrl.SetForegroundColour(wx.Colour(235, 235, 235))
         self.report_ctrl.SetFont(wx.Font(12, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.report_ctrl.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Diagnostics report"))
         sizer.Add(self.report_ctrl, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
 
         button_row = wx.BoxSizer(wx.HORIZONTAL)
-        refresh_btn = wx.Button(panel, label="Refresh")
-        read_btn = wx.Button(panel, label="Read Summary")
-        close_btn = wx.Button(panel, label="Close")
+        refresh_btn = wx.Button(panel, label="&Refresh")
+        read_btn = wx.Button(panel, label="Read &Summary")
+        close_btn = wx.Button(panel, label="&Close")
         refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh)
+        refresh_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Refresh"))
         read_btn.Bind(wx.EVT_BUTTON, self.on_read_summary)
+        read_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Read Summary"))
         close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        close_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Close"))
         button_row.Add(refresh_btn, 0, wx.RIGHT, 8)
         button_row.Add(read_btn, 0, wx.RIGHT, 8)
         button_row.AddStretchSpacer(1)
@@ -59,6 +63,7 @@ class PlatformDiagnosticsApp(BlindApp):
 
         panel.SetSizer(sizer)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
+
         self.frame.Show()
         self.refresh_report(announce=True)
 

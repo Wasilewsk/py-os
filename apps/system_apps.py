@@ -57,10 +57,11 @@ class SettingsApp(BlindApp):
 
         sizer.Add(self.notebook, 1, wx.EXPAND | wx.ALL, 10)
 
-        close_btn = wx.Button(panel, label="Save and Close")
+        close_btn = wx.Button(panel, label="&Save and Close")
         close_btn.SetBackgroundColour(wx.Colour(0, 100, 0))
         close_btn.SetForegroundColour(wx.Colour(255, 255, 255))
         close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        close_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Save and Close"))
         sizer.Add(close_btn, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 15)
 
         panel.SetSizer(sizer)
@@ -94,6 +95,7 @@ class SettingsApp(BlindApp):
         self.speed_slider = wx.Slider(panel, value=200, minValue=50, maxValue=400, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
         self.speed_slider.SetValue(getattr(self.api.engine, "get_rate", lambda: 200)())
         self.speed_slider.SetBackgroundColour(wx.Colour(40, 40, 40))
+        self.speed_slider.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak(f"Voice speed: {self.speed_slider.GetValue()}"))
         sizer.Add(self.speed_slider, 0, wx.EXPAND | wx.ALL, 10)
 
         speech_label = wx.StaticText(panel, label="Speech Engine:")
@@ -106,6 +108,7 @@ class SettingsApp(BlindApp):
         idx = next((i for i, m in enumerate(self.speech_modes) if m[1] == current_mode), 0)
         self.speech_choice.SetSelection(idx)
         self.speech_choice.Bind(wx.EVT_CHOICE, self.on_speech_mode_change)
+        self.speech_choice.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Speech engine"))
         sizer.Add(self.speech_choice, 0, wx.EXPAND | wx.ALL, 8)
 
         self.notebook.AddPage(panel, "Speech")
@@ -124,6 +127,7 @@ class SettingsApp(BlindApp):
         self.input_choice = wx.Choice(panel, choices=input_labels)
         self.input_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
         self.input_choice.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.input_choice.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Input device"))
         selected_input_index = audio_devices.resolve_selected_index(
             self.input_entries, config, "input_device_index", "input_device"
         )
@@ -147,6 +151,7 @@ class SettingsApp(BlindApp):
         self.output_choice = wx.Choice(panel, choices=output_labels)
         self.output_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
         self.output_choice.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.output_choice.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Output device"))
         selected_output_index = audio_devices.resolve_selected_index(
             self.output_entries, config, "output_device_index", "output_device"
         )
@@ -161,10 +166,11 @@ class SettingsApp(BlindApp):
             self.output_choice.SetSelection(0)
         sizer.Add(self.output_choice, 0, wx.EXPAND | wx.ALL, 8)
 
-        test_btn = wx.Button(panel, label="Test Audio")
+        test_btn = wx.Button(panel, label="&Test Audio")
         test_btn.SetBackgroundColour(wx.Colour(50, 50, 100))
         test_btn.SetForegroundColour(wx.Colour(255, 255, 255))
         test_btn.Bind(wx.EVT_BUTTON, self.on_test_audio)
+        test_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Test Audio"))
         sizer.Add(test_btn, 0, wx.EXPAND | wx.ALL, 8)
 
         self.notebook.AddPage(panel, "Audio")
@@ -180,6 +186,7 @@ class SettingsApp(BlindApp):
         self.theme_choice = wx.Choice(panel, choices=themes if themes else ["Modern"])
         self.theme_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
         self.theme_choice.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.theme_choice.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Sound theme"))
         current_theme = self.api.sounds.current_theme
         if current_theme in themes:
             self.theme_choice.SetSelection(themes.index(current_theme))
@@ -204,6 +211,7 @@ class SettingsApp(BlindApp):
         self.music_choice = wx.Choice(panel, choices=[self._music_choice_label(value) for value in self.music_choice_values])
         self.music_choice.SetBackgroundColour(wx.Colour(40, 40, 40))
         self.music_choice.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.music_choice.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Background music"))
         self.music_choice.Bind(wx.EVT_CHOICE, self.on_music_changed)
         self.music_config_path = self.api.sounds.music_config_path
         selected_music = self.api.sounds.load_background_music()
@@ -215,6 +223,7 @@ class SettingsApp(BlindApp):
         self.music_volume = wx.Slider(panel, value=50, minValue=0, maxValue=100, style=wx.SL_HORIZONTAL | wx.SL_LABELS)
         self.music_volume.SetBackgroundColour(wx.Colour(40, 40, 40))
         self.music_volume.SetValue(self._load_music_volume())
+        self.music_volume.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak(f"Background music volume: {self.music_volume.GetValue()}"))
         volume_sizer.Add(self.music_volume, 0, wx.EXPAND | wx.ALL, 10)
         sizer.Add(volume_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -230,6 +239,7 @@ class SettingsApp(BlindApp):
         self.update_output = wx.TextCtrl(panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
         self.update_output.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.update_output.SetForegroundColour(wx.Colour(180, 255, 180))
+        self.update_output.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Update output"))
         sizer.Add(self.update_output, 1, wx.EXPAND | wx.ALL, 10)
 
         self.update_gauge = wx.Gauge(panel, range=100, size=(-1, 20))
@@ -239,10 +249,11 @@ class SettingsApp(BlindApp):
         self.update_gauge.Hide()
         sizer.Add(self.update_gauge, 0, wx.EXPAND | wx.ALL, 10)
 
-        self.update_btn = wx.Button(panel, label="Check for Updates")
+        self.update_btn = wx.Button(panel, label="&Check for Updates")
         self.update_btn.SetBackgroundColour(wx.Colour(50, 50, 50))
         self.update_btn.SetForegroundColour(wx.Colour(255, 255, 255))
         self.update_btn.Bind(wx.EVT_BUTTON, self.check_updates)
+        self.update_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Check for Updates"))
         sizer.Add(self.update_btn, 0, wx.EXPAND | wx.ALL, 10)
 
         self.notebook.AddPage(panel, "Updates")
@@ -290,7 +301,8 @@ class SettingsApp(BlindApp):
             if theme_music is not None:
                 self._set_music_choice_value(theme_music)
             self.api.play_sound("startup")
-            self.api.speak(theme_name)
+            if not self.api.is_enhanced_mode():
+                self.api.speak(theme_name)
 
     def _music_choice_label(self, music_value):
         if not music_value or music_value == "None":
@@ -343,7 +355,8 @@ class SettingsApp(BlindApp):
         self.api.sounds.save_background_music(selected_music)
         self._save_music_volume()
         name = selected_music.replace(".aif", "").replace(".wav", "").replace("_", " ").strip()
-        self.api.speak(f"Music: {name}" if name != "None" else "Music: None")
+        if not self.api.is_enhanced_mode():
+            self.api.speak(f"Music: {name}" if name != "None" else "Music: None")
 
     def _apply_speech_mode_selection(self, announce=True):
         sel = self.speech_choice.GetSelection()
@@ -362,7 +375,8 @@ class SettingsApp(BlindApp):
             self.api.speak("Could not switch speech mode.", interrupt=False)
 
     def on_speech_mode_change(self, event):
-        self._apply_speech_mode_selection(announce=True)
+        if not self.api.is_enhanced_mode():
+            self._apply_speech_mode_selection(announce=True)
 
     def check_updates(self, event):
         self.update_btn.Disable()
@@ -513,8 +527,8 @@ class FileExplorerApp(BlindApp):
 
         # --- Navigation Toolbar ---
         nav_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.back_button = wx.Button(panel, label="Back")
-        self.up_button = wx.Button(panel, label="Up")
+        self.back_button = wx.Button(panel, label="&Back")
+        self.up_button = wx.Button(panel, label="&Up")
         self.address_bar = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
         self.address_bar.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.address_bar.SetForegroundColour(wx.Colour(255, 255, 255))
@@ -536,8 +550,8 @@ class FileExplorerApp(BlindApp):
         
         # --- Buttons ---
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        refresh_btn = wx.Button(panel, label="Refresh")
-        close_btn = wx.Button(panel, label="Close")
+        refresh_btn = wx.Button(panel, label="&Refresh")
+        close_btn = wx.Button(panel, label="&Close")
         
         button_sizer.Add(refresh_btn, 0, wx.ALL, 5)
         button_sizer.AddStretchSpacer(1)
@@ -549,13 +563,18 @@ class FileExplorerApp(BlindApp):
         
         # Bindings
         self.back_button.Bind(wx.EVT_BUTTON, self.go_back)
+        self.back_button.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Back"))
         self.up_button.Bind(wx.EVT_BUTTON, self.go_up)
+        self.up_button.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Up"))
         self.address_bar.Bind(wx.EVT_TEXT_ENTER, self.go_to_address)
         self.list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
         self.list.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.on_item_focused)
         self.list.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+        self.list.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("File list"))
         refresh_btn.Bind(wx.EVT_BUTTON, lambda e: self.refresh_files())
+        refresh_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Refresh"))
         close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        close_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Close"))
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
         
         self.refresh_files()
@@ -765,13 +784,14 @@ class TextEditorApp(BlindApp):
         self.text_ctrl = wx.TextCtrl(panel, style=wx.TE_MULTILINE | wx.TE_RICH)
         self.text_ctrl.SetBackgroundColour(wx.Colour(30, 30, 30))
         self.text_ctrl.SetForegroundColour(wx.Colour(220, 220, 220))
+        self.text_ctrl.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Text editor"))
         main_sizer.Add(self.text_ctrl, 1, wx.EXPAND | wx.ALL, 5)
         
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        new_btn = wx.Button(panel, label="New")
-        open_btn = wx.Button(panel, label="Open")
-        save_btn = wx.Button(panel, label="Save")
-        close_btn = wx.Button(panel, label="Close")
+        new_btn = wx.Button(panel, label="&New")
+        open_btn = wx.Button(panel, label="&Open")
+        save_btn = wx.Button(panel, label="&Save")
+        close_btn = wx.Button(panel, label="&Close")
         
         button_sizer.Add(new_btn, 0, wx.ALL, 5)
         button_sizer.Add(open_btn, 0, wx.ALL, 5)
@@ -788,9 +808,13 @@ class TextEditorApp(BlindApp):
         panel.SetSizer(main_sizer)
         
         new_btn.Bind(wx.EVT_BUTTON, self.on_new)
+        new_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("New"))
         open_btn.Bind(wx.EVT_BUTTON, self.on_open)
+        open_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Open"))
         save_btn.Bind(wx.EVT_BUTTON, self.on_save)
+        save_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Save"))
         close_btn.Bind(wx.EVT_BUTTON, self.on_close)
+        close_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Close"))
         self.text_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_text_key)
         self.frame.Bind(wx.EVT_CHAR_HOOK, self.on_frame_key)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)

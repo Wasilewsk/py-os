@@ -88,13 +88,16 @@ class ThemeCreatorApp(BlindApp):
             size=(520, 260),
         )
 
-        create_button = wx.Button(panel, label="Create New Theme")
-        open_button = wx.Button(panel, label="Open Theme")
+        create_button = wx.Button(panel, label="&Create New Theme")
+        open_button = wx.Button(panel, label="&Open Theme")
 
         create_button.SetBackgroundColour(wx.Colour(30, 90, 30))
         create_button.SetForegroundColour(wx.Colour(255, 255, 255))
         open_button.SetBackgroundColour(wx.Colour(40, 40, 90))
         open_button.SetForegroundColour(wx.Colour(255, 255, 255))
+
+        create_button.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Create New Theme"))
+        open_button.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Open Theme"))
 
         sizer.Add(create_button, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 16)
         sizer.Add(open_button, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 16)
@@ -121,7 +124,9 @@ class ThemeCreatorApp(BlindApp):
 
         self.theme_name_input = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
         self.theme_name_input.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        next_button = wx.Button(panel, label="Next")
+        self.theme_name_input.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Theme name"))
+        next_button = wx.Button(panel, label="&Next")
+        next_button.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Next"))
 
         sizer.Add(self.theme_name_input, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
         sizer.Add(next_button, 0, wx.ALIGN_CENTER | wx.BOTTOM, 12)
@@ -191,6 +196,7 @@ class ThemeCreatorApp(BlindApp):
         self.sound_list = wx.ListBox(panel, choices=self.slot_labels, style=wx.LB_SINGLE)
         self.sound_list.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.sound_list.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.sound_list.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Theme sounds list"))
         sizer.Add(self.sound_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
 
         current_label = wx.StaticText(panel, label="Current sound assignment:")
@@ -204,11 +210,12 @@ class ThemeCreatorApp(BlindApp):
         self.assignment_display.SetBackgroundColour(wx.Colour(25, 25, 25))
         self.assignment_display.SetForegroundColour(wx.Colour(220, 220, 220))
         self.assignment_display.SetMinSize((-1, 110))
+        self.assignment_display.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Current sound assignment"))
         sizer.Add(self.assignment_display, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
 
         button_row = wx.BoxSizer(wx.HORIZONTAL)
-        self.browse_button = wx.Button(panel, label="Browse...")
-        self.save_button = wx.Button(panel, label="Save Theme")
+        self.browse_button = wx.Button(panel, label="&Browse...")
+        self.save_button = wx.Button(panel, label="&Save Theme")
         self.browse_button.SetBackgroundColour(wx.Colour(40, 40, 90))
         self.browse_button.SetForegroundColour(wx.Colour(255, 255, 255))
         self.save_button.SetBackgroundColour(wx.Colour(0, 100, 0))
@@ -222,8 +229,9 @@ class ThemeCreatorApp(BlindApp):
         self.sound_list.Bind(wx.EVT_LISTBOX, self.on_sound_selected)
         self.sound_list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_browse_file)
         self.browse_button.Bind(wx.EVT_BUTTON, self.on_browse_file)
+        self.browse_button.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Browse"))
         self.save_button.Bind(wx.EVT_BUTTON, self.on_save_theme)
-
+        self.save_button.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Save Theme"))
         self.frame.Show()
         if self.slot_labels:
             self.sound_list.SetSelection(0)

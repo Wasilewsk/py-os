@@ -24,6 +24,7 @@ class TerminalApp(BlindApp):
         self.input_ctrl.SetBackgroundColour(wx.Colour(30, 30, 30))
         self.input_ctrl.SetForegroundColour(wx.Colour(0, 255, 0))
         self.input_ctrl.SetFont(wx.Font(14, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+        self.input_ctrl.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Terminal input"))
         sizer.Add(self.input_ctrl, 0, wx.EXPAND | wx.ALL, 10)
         self.panel.SetSizer(sizer)
         self.input_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_enter)

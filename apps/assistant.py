@@ -38,23 +38,27 @@ class AssistantApp(BlindApp):
         self.model_choice.SetForegroundColour(wx.Colour(255, 255, 255))
         self.model_choice.SetSelection(0)
         self.model_choice.Bind(wx.EVT_CHOICE, self.on_model_change)
+        self.model_choice.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Model selection"))
         model_row.Add(self.model_choice, 1, wx.EXPAND | wx.ALL, 5)
 
-        refresh_btn = wx.Button(panel, label="Refresh Models")
+        refresh_btn = wx.Button(panel, label="&Refresh Models")
         refresh_btn.SetBackgroundColour(wx.Colour(40, 40, 80))
         refresh_btn.SetForegroundColour(wx.Colour(255, 255, 255))
         refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh_models)
+        refresh_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Refresh Models"))
         model_row.Add(refresh_btn, 0, wx.ALL, 5)
         sizer.Add(model_row, 0, wx.EXPAND | wx.ALL, 10)
 
         self.input_ctrl = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER)
         self.input_ctrl.SetBackgroundColour(wx.Colour(30, 30, 60))
         self.input_ctrl.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.input_ctrl.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Type your question"))
         sizer.Add(self.input_ctrl, 0, wx.EXPAND | wx.ALL, 10)
 
         self.history = wx.TextCtrl(panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
         self.history.SetBackgroundColour(wx.Colour(10, 10, 30))
         self.history.SetForegroundColour(wx.Colour(200, 200, 255))
+        self.history.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Conversation history"))
         sizer.Add(self.history, 1, wx.EXPAND | wx.ALL, 10)
 
         panel.SetSizer(sizer)
@@ -69,7 +73,8 @@ class AssistantApp(BlindApp):
         sel = self.model_choice.GetSelection()
         if 0 <= sel < len(self.models):
             self.model = self.models[sel]
-            self.api.speak(f"Model set to {self.model}")
+            if not self.api.is_enhanced_mode():
+                self.api.speak(f"Model set to {self.model}")
 
     def on_refresh_models(self, event):
         self.api.speak("Refreshing models...")

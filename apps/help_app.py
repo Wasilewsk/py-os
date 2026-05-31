@@ -70,19 +70,20 @@ class HelpApp(BlindApp):
         self.list.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.list.SetForegroundColour(wx.Colour(255, 255, 255))
         self.list.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_MEDIUM))
+        self.list.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Topics list"))
         sizer.Add(self.list, 1, wx.EXPAND | wx.ALL, 10)
-        
-        read_btn = wx.Button(panel, label="Read Topic")
+
+        read_btn = wx.Button(panel, label="&Read Topic")
         read_btn.SetDefault()
+        read_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Read Topic"))
         sizer.Add(read_btn, 0, wx.ALL | wx.CENTER, 10)
-        
+
         panel.SetSizer(sizer)
-        
+
         self.list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_read)
         read_btn.Bind(wx.EVT_BUTTON, self.on_read)
         self.list.Bind(wx.EVT_LISTBOX, self.on_select)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
-        
         self.frame.Show()
         self.api.speak("Help Center opened. Select a topic to read.")
         self.list.SetFocus()

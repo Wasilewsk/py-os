@@ -41,6 +41,7 @@ class MessagesApp(BlindApp):
         self.msg_list.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.msg_list.SetForegroundColour(wx.Colour(0, 255, 0))
         self.msg_list.SetHelpText("List of sent and received messages.")
+        self.msg_list.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Message history"))
         main_sizer.Add(self.msg_list, 1, wx.EXPAND | wx.ALL, 10)
         
         # --- Send Box ---
@@ -56,7 +57,8 @@ class MessagesApp(BlindApp):
         main_sizer.Add(self.send_input, 0, wx.EXPAND | wx.ALL, 10)
         
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.send_btn = wx.Button(panel, label="Send Message")
+        self.send_btn = wx.Button(panel, label="&Send Message")
+        self.send_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Send Message"))
         btn_sizer.Add(self.send_btn, 1, wx.ALL, 5)
         main_sizer.Add(btn_sizer, 0, wx.EXPAND | wx.ALL, 5)
         
@@ -67,6 +69,7 @@ class MessagesApp(BlindApp):
         self.send_btn.Bind(wx.EVT_BUTTON, self.on_send)
         self.msg_list.Bind(wx.EVT_LISTBOX, self.on_item_focused)
         self.frame.Bind(wx.EVT_CLOSE, self.on_close)
+
         
         # Load history and subscribe
         for msg in self.api.message_service.history:

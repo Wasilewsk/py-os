@@ -58,10 +58,12 @@ class EncryptionApp(BlindApp):
         self.file_display = wx.TextCtrl(panel, style=wx.TE_READONLY)
         self.file_display.SetBackgroundColour(wx.Colour(20, 20, 20))
         self.file_display.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.file_display.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Selected file"))
         sizer.Add(self.file_display, 0, wx.EXPAND | wx.ALL, 10)
 
-        browse_btn = wx.Button(panel, label="Browse for File")
+        browse_btn = wx.Button(panel, label="&Browse for File")
         browse_btn.Bind(wx.EVT_BUTTON, self.on_browse)
+        browse_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Browse for File"))
         sizer.Add(browse_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         mode_lbl = wx.StaticText(panel, label="Operation:")
@@ -71,6 +73,7 @@ class EncryptionApp(BlindApp):
         self.mode_radio = wx.RadioBox(panel, choices=["Encrypt", "Decrypt"], style=wx.RA_HORIZONTAL)
         self.mode_radio.SetBackgroundColour(wx.Colour(0, 0, 0))
         self.mode_radio.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.mode_radio.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Operation: Encrypt or Decrypt"))
         sizer.Add(self.mode_radio, 0, wx.EXPAND | wx.ALL, 10)
 
         pw_lbl = wx.StaticText(panel, label="Password:")
@@ -80,11 +83,13 @@ class EncryptionApp(BlindApp):
         self.pw_input = wx.TextCtrl(panel, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER)
         self.pw_input.SetBackgroundColour(wx.Colour(30, 30, 30))
         self.pw_input.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.pw_input.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Password"))
         sizer.Add(self.pw_input, 0, wx.EXPAND | wx.ALL, 10)
 
-        run_btn = wx.Button(panel, label="Run")
+        run_btn = wx.Button(panel, label="&Run")
         run_btn.SetDefault()
         run_btn.Bind(wx.EVT_BUTTON, self.on_run)
+        run_btn.Bind(wx.EVT_SET_FOCUS, lambda e: self.api.speak("Run"))
         self.pw_input.Bind(wx.EVT_TEXT_ENTER, self.on_run)
         sizer.Add(run_btn, 0, wx.ALL | wx.CENTER, 10)
 
