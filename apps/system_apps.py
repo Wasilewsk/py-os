@@ -396,6 +396,13 @@ class SettingsApp(BlindApp):
             set_gauge(95)
             self.cleanup_deprecated_sound_artifacts()
             set_gauge(100)
+            update_state = {"phase": 1}
+            state_path = self.api.get_data_path("update_state.json")
+            try:
+                with open(state_path, "w") as f:
+                    json.dump(update_state, f)
+            except Exception:
+                pass
             speak("Update complete. Restarting...")
             time.sleep(1)
             subprocess.Popen([sys.executable, os.path.join(os.getcwd(), "desktop.py")], cwd=os.getcwd())

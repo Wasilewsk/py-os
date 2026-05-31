@@ -362,7 +362,7 @@ class PyOSController:
         critical_files = [
             "api.py", "app_paths.py", "audio_devices.py", "kernel.py",
             "message_service.py", "platform_support.py", "sounds.py",
-            "speech.py", "oobe_wizard.py"
+            "speech.py", "oobe_wizard.py", "update_wizard.py"
         ]
         missing = []
         for f in critical_files:
@@ -378,7 +378,18 @@ class PyOSController:
             repair.Show()
             return
 
-        # 2. Setup/OOBE/Login flow
+        # 2. Pending updates
+        update_state_path = self.api.get_data_path("update_state.json")
+        if os.path.exists(update_state_path):
+            from update_wizard import UpdateWizard
+            wizard = UpdateWizard(self.api, update_state_path, on_finish=self._continue_boot)
+            wizard.Show()
+            return
+
+        # 3. Setup/OOBE/Login flow
+        self._continue_boot()
+
+    def _continue_boot(self):
         config_path = self.api.get_data_path("config.json")
         if not os.path.exists(config_path):
             self.launch_oobe()
@@ -481,7 +492,7 @@ def check_system_integrity():
     critical_files = [
         "api.py", "app_paths.py", "audio_devices.py", "kernel.py",
         "message_service.py", "platform_support.py", "sounds.py",
-        "speech.py", "oobe_wizard.py"
+        "speech.py", "oobe_wizard.py", "update_wizard.py"
     ]
     missing = []
     for f in critical_files:
