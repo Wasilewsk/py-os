@@ -225,8 +225,15 @@ class SettingsApp(BlindApp):
         info.SetForegroundColour(wx.Colour(200, 200, 200))
         sizer.Add(info, 0, wx.ALL, 15)
 
+        self.update_output = wx.TextCtrl(panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
+        self.update_output.SetBackgroundColour(wx.Colour(20, 20, 20))
+        self.update_output.SetForegroundColour(wx.Colour(180, 255, 180))
+        sizer.Add(self.update_output, 1, wx.EXPAND | wx.ALL, 10)
+
         self.update_gauge = wx.Gauge(panel, range=100, size=(-1, 20))
         self.update_gauge.SetBackgroundColour(wx.Colour(40, 40, 40))
+        self.update_gauge.SetCanFocus(True)
+        self.update_gauge.Bind(wx.EVT_SET_FOCUS, lambda e: (self.api.speak(f"Update progress: {self.update_gauge.GetValue()} percent"), e.Skip()))
         self.update_gauge.Hide()
         sizer.Add(self.update_gauge, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -358,18 +365,21 @@ class SettingsApp(BlindApp):
     def _update_thread(self):
         def set_gauge(val):
             wx.CallAfter(self.update_gauge.SetValue, val)
-        def speak(msg):
+        def log(msg):
+            wx.CallAfter(self.update_output.AppendText, msg + "\n")
             wx.CallAfter(self.api.speak, msg)
         def hide_gauge():
             wx.CallAfter(self.update_gauge.Hide)
             wx.CallAfter(self.update_btn.Enable)
 
         try:
+            log("Setting remote URL...")
             set_gauge(10)
             subprocess.run(["git", "remote", "set-url", "origin", "https://github.com/wasilewsk/py-os.git"],
                            check=True, capture_output=True, text=True)
             set_gauge(25)
 
+            log("Checking branch...")
             branch_result = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
                 capture_output=True, text=True, check=True,
@@ -377,6 +387,7 @@ class SettingsApp(BlindApp):
             branch_name = branch_result.stdout.strip() or "master"
             set_gauge(35)
 
+            log("Pulling updates...")
             result = subprocess.run(
                 ["git", "pull", "origin", branch_name],
                 capture_output=True, text=True, check=True,
@@ -384,10 +395,11 @@ class SettingsApp(BlindApp):
             set_gauge(60)
 
             if "Already up to date" in result.stdout:
-                speak("System is already up to date. Checking requirements...")
+                log("System is already up to date.")
             else:
-                speak("Core updates downloaded. Updating requirements...")
+                log("Core updates downloaded.")
 
+            log("Updating requirements...")
             set_gauge(75)
             subprocess.run(
                 [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
@@ -403,7 +415,15 @@ class SettingsApp(BlindApp):
                     json.dump(update_state, f)
             except Exception:
                 pass
-            speak("Update complete. Restarting...")
+            # Save music config before restart so background music isn't reset
+            sel_music = self._get_selected_music_value()
+            music_cfg = {"music": sel_music, "volume": self.music_volume.GetValue()}
+            try:
+                with open(self.music_config_path, "w") as f:
+                    json.dump(music_cfg, f)
+            except Exception:
+                pass
+            log("Update complete. Restarting...")
             time.sleep(1)
             subprocess.Popen([sys.executable, os.path.join(os.getcwd(), "desktop.py")], cwd=os.getcwd())
             hide_gauge()
@@ -412,10 +432,10 @@ class SettingsApp(BlindApp):
 
         except subprocess.CalledProcessError as e:
             err = e.stderr if e.stderr else "Check your internet connection or git status"
-            speak(f"Update failed: {err}")
+            log(f"Update failed: {err}")
             hide_gauge()
         except Exception as e:
-            speak(f"Error during update: {e}")
+            log(f"Error during update: {e}")
             hide_gauge()
 
     def cleanup_deprecated_sound_artifacts(self):
